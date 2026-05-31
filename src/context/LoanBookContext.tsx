@@ -81,6 +81,10 @@ import { useAuth } from './AuthContext'
 
 const SYNC_DEBOUNCE_MS = 2000
 
+function isBrowserOffline(): boolean {
+  return typeof navigator !== 'undefined' && !navigator.onLine
+}
+
 export type ToastVariant = 'success' | 'error' | 'warning'
 export type AppToast = { message: string; variant: ToastVariant }
 
@@ -324,9 +328,27 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
           applyHealedBook(cache.data, cache.settings)
           setDataReady(true)
           setDataLoading(false)
-          setSyncStatus(meta.pendingChanges ? 'idle' : meta.lastSyncedAt ? 'synced' : 'idle')
+          if (isBrowserOffline()) {
+            setSyncStatus('offline')
+          } else {
+            setSyncStatus(
+              meta.pendingChanges ? 'idle' : meta.lastSyncedAt ? 'synced' : 'idle',
+            )
+          }
         } else {
           reportLoadProgress({ percent: 8, label: 'Connecting to cloud…' })
+        }
+
+        if (isBrowserOffline()) {
+          if (cache) {
+            reportLoadProgress({ percent: 100, label: 'Ready' })
+          } else {
+            showToast('You are offline and no saved copy was found on this device.', 'error')
+            setSyncStatus('offline')
+            setDataReady(true)
+            setDataLoading(false)
+          }
+          return
         }
 
         try {
@@ -419,9 +441,11 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
         } catch (err) {
           if (cancelled) return
           if (cache) {
-            meta = saveSyncMeta(userId, { lastError: (err as Error).message })
-            setSyncMeta(meta)
             setSyncStatus('offline')
+            if (!isBrowserOffline()) {
+              meta = saveSyncMeta(userId, { lastError: (err as Error).message })
+              setSyncMeta(meta)
+            }
           } else {
             showToast((err as Error).message || 'Failed to load data', 'error')
           }
@@ -503,8 +527,12 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
         saveLocalCache(userId, payload, settingsRef.current)
         const meta = saveSyncMeta(userId, { pendingChanges: true, lastError: null })
         setSyncMeta(meta)
-        setSyncStatus('idle')
-        scheduleSync()
+        if (isBrowserOffline()) {
+          setSyncStatus('offline')
+        } else {
+          setSyncStatus('idle')
+          scheduleSync()
+        }
       } else {
         saveLocalCache(LOCAL_BOOK_STORAGE_ID, payload, settingsRef.current)
       }
@@ -545,7 +573,11 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
         saveLocalCache(userId, { borrowers, loans, payments, partners }, normalized)
         const meta = saveSyncMeta(userId, { pendingChanges: true, lastError: null })
         setSyncMeta(meta)
-        scheduleSync()
+        if (isBrowserOffline()) {
+          setSyncStatus('offline')
+        } else {
+          scheduleSync()
+        }
         showToast('Settings saved')
       } else {
         saveSettings(normalized)
