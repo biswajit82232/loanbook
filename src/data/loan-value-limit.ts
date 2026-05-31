@@ -4,6 +4,8 @@ import { formatCurrency, getLoanTotalDue } from './helpers'
 /** Alert when total due reaches this fraction of value limit (e.g. 0.9 = 90%). */
 export const VALUE_LIMIT_CLOSE_RATIO = 0.9
 
+export type ValueLimitSeverity = 'near' | 'at_limit'
+
 export interface LoanValueLimitAlert {
   loan: Loan
   borrowerId: string
@@ -11,7 +13,17 @@ export interface LoanValueLimitAlert {
   valueLimit: number
   /** 0–1+ (can exceed 1 when over limit) */
   ratio: number
+  /** 90–99% of limit vs at/over 100% */
+  severity: ValueLimitSeverity
   dismissKey: string
+}
+
+export function getValueLimitSeverity(alert: LoanValueLimitAlert): ValueLimitSeverity {
+  return alert.severity
+}
+
+export function isValueLimitAtOrOver(alert: LoanValueLimitAlert): boolean {
+  return alert.severity === 'at_limit'
 }
 
 export function getValueLimitDismissKey(loanId: string): string {
@@ -33,12 +45,16 @@ export function getLoanValueLimitAlert(
   const ratio = totalDue / valueLimit
   if (ratio < VALUE_LIMIT_CLOSE_RATIO) return null
 
+  const severity: ValueLimitSeverity =
+    totalDue >= valueLimit ? 'at_limit' : 'near'
+
   return {
     loan,
     borrowerId: loan.borrowerId,
     totalDue,
     valueLimit,
     ratio,
+    severity,
     dismissKey: getValueLimitDismissKey(loan.id),
   }
 }
@@ -58,10 +74,11 @@ export function getValueLimitAlerts(
     .sort((a, b) => b.ratio - a.ratio)
 }
 
+export function formatValueLimitBadgeLabel(alert: LoanValueLimitAlert): string {
+  return alert.severity === 'at_limit' ? 'Act now' : 'Near limit'
+}
+
 export function formatValueLimitAlertLabel(alert: LoanValueLimitAlert): string {
   const pct = Math.round(alert.ratio * 100)
-  if (alert.totalDue >= alert.valueLimit) {
-    return `At limit — ${formatCurrency(alert.totalDue)} of ${formatCurrency(alert.valueLimit)} (${pct}%)`
-  }
-  return `Near limit — ${formatCurrency(alert.totalDue)} of ${formatCurrency(alert.valueLimit)} (${pct}%)`
+  return `${formatCurrency(alert.totalDue)} / ${formatCurrency(alert.valueLimit)} (${pct}%)`
 }

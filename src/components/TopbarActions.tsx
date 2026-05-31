@@ -170,7 +170,13 @@ export function TopbarActions() {
                     return (
                       <li
                         key={r.dismissKey}
-                        className={`topbar-notify-item${r.isCritical ? ' topbar-notify-item--critical' : ''}`}
+                        className={`topbar-notify-item${
+                          r.isUrgent
+                            ? ' topbar-notify-item--urgent'
+                            : r.isCritical
+                              ? ' topbar-notify-item--critical'
+                              : ''
+                        }`}
                       >
                         <button
                           type="button"

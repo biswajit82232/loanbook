@@ -247,12 +247,8 @@ export function LoanFormPage({ mode, loanId, borrowerId: presetBorrowerId }: Loa
                 step={1}
                 value={valueLimit}
                 onChange={(e) => setValueLimit(e.target.value)}
-                placeholder="Optional — alert near limit"
+                placeholder="Optional"
               />
-              <span className="field-hint">
-                Red alert when principal due + interest reaches 90% of this amount. Leave empty to
-                disable.
-              </span>
             </label>
 
             <OptionButtons
@@ -296,11 +292,8 @@ export function LoanFormPage({ mode, loanId, borrowerId: presetBorrowerId }: Loa
               step={1}
               value={valueLimit}
               onChange={(e) => setValueLimit(e.target.value)}
-              placeholder="Optional — alert near limit"
+              placeholder="Optional"
             />
-            <span className="field-hint">
-              Red alert when principal due + interest reaches 90% of this amount.
-            </span>
           </label>
         )}
 

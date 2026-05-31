@@ -161,17 +161,7 @@ export function Borrowers() {
   return (
     <div className="page">
       {borrowers.length > 0 && (
-        <section className="kpi-grid kpi-grid--3 borrowers-page-totals">
-          <KpiCard
-            label="Principal due"
-            value={formatCurrency(pageTotals.principalDue)}
-            variant="accent"
-          />
-          <KpiCard
-            label="Interest due"
-            value={formatCurrency(pageTotals.interestDue)}
-            variant="interest"
-          />
+        <section className="kpi-grid borrowers-page-totals">
           <KpiCard label="Total due" value={formatCurrency(pageTotals.totalDue)} variant="success" />
         </section>
       )}

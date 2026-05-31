@@ -17,7 +17,7 @@ import { BtnIcon } from '../../components/BtnIcon'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Icon } from '../../components/icons'
 import { formatDueSummary, getLoanDueInfo } from '../../data/loan-due'
-import { formatValueLimitAlertLabel, getLoanValueLimitAlert } from '../../data/loan-value-limit'
+import { formatValueLimitBadgeLabel, getLoanValueLimitAlert } from '../../data/loan-value-limit'
 import { useNavigation } from '../../context/NavigationContext'
 import { useLoanBook } from '../../context/LoanBookContext'
 import { DetailField, DetailGrid, DetailSection } from '../../components/DetailSection'
@@ -70,7 +70,13 @@ export function LoanDetail({ id }: { id: string }) {
       <div className="detail-hero">
         <span className="detail-hero-badges">
           {valueLimitAlert && (
-            <span className="badge badge-danger">Near limit</span>
+            <span
+              className={`badge ${
+                valueLimitAlert.severity === 'at_limit' ? 'badge-urgent' : 'badge-danger'
+              }`}
+            >
+              {formatValueLimitBadgeLabel(valueLimitAlert)}
+            </span>
           )}
           {due.status !== 'none' && due.status !== 'upcoming' && (
             <span className={`badge badge-${due.status === 'overdue' ? 'due' : due.status === 'due_soon' ? 'due-soon' : 'pending'}`}>
@@ -109,9 +115,6 @@ export function LoanDetail({ id }: { id: string }) {
             label="Value limit"
             value={loan.valueLimit > 0 ? formatCurrency(loan.valueLimit) : '—'}
           />
-          {valueLimitAlert && (
-            <DetailField label="Limit alert" value={formatValueLimitAlertLabel(valueLimitAlert)} full />
-          )}
           <DetailField label="Lent on" value={loan.startDate} />
           <DetailField
             label={loan.status === 'Pending' ? 'Disbursement due' : 'Interest due date'}

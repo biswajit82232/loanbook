@@ -21,10 +21,10 @@ import {
   type DashboardAttentionItem,
 } from '../data/reminders'
 
-function attentionKindLabel(kind: DashboardAttentionItem['kind']) {
-  switch (kind) {
+function attentionKindLabel(item: DashboardAttentionItem) {
+  switch (item.kind) {
     case 'value_limit':
-      return 'Near limit'
+      return item.isUrgent ? 'Act now' : 'Near limit'
     case 'payment_due':
       return 'Overdue'
     case 'payment_due_soon':
@@ -53,7 +53,8 @@ export function Dashboard() {
     [loans, settings.attentionDismissed, settings.reminderPeriodDays, getBorrower],
   )
 
-  const hasCriticalAttention = attentionItems.some((item) => item.kind === 'value_limit')
+  const hasUrgentAttention = attentionItems.some((item) => item.isUrgent)
+  const hasValueLimitAttention = attentionItems.some((item) => item.kind === 'value_limit')
 
   const newestLoans = useMemo(
     () => [...loans].sort(compareLoanByStartDateNewest).slice(0, 3),
@@ -84,7 +85,13 @@ export function Dashboard() {
           <h2>Needs attention</h2>
           {attentionItems.length > 0 && (
             <span
-              className={`attention-count${hasCriticalAttention ? ' attention-count--critical' : ''}`}
+              className={`attention-count${
+                hasUrgentAttention
+                  ? ' attention-count--urgent'
+                  : hasValueLimitAttention
+                    ? ' attention-count--critical'
+                    : ''
+              }`}
               aria-label={`${attentionItems.length} items`}
             >
               {attentionItems.length}
@@ -102,7 +109,9 @@ export function Dashboard() {
             {attentionItems.map((item) => {
               const typeBadge =
                 item.kind === 'value_limit'
-                  ? 'danger'
+                  ? item.isUrgent
+                    ? 'urgent'
+                    : 'danger'
                   : item.kind === 'payment_due'
                     ? 'due'
                     : item.kind === 'payment_due_soon'
@@ -120,7 +129,7 @@ export function Dashboard() {
                         {item.borrowerName}
                       </SafeText>
                       <span className={`badge badge-${typeBadge}`}>
-                        {attentionKindLabel(item.kind)}
+                        {attentionKindLabel(item)}
                       </span>
                     </div>
                     <div className="compact-row-mid">

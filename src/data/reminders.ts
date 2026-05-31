@@ -4,7 +4,6 @@ import { borrowerHasPhone } from '../utils/phone'
 
 export { borrowerHasPhone }
 import {
-  formatCurrency,
   getBuiltUpInterest,
   getInterestAccrualDays,
   getLoanTotalDue,
@@ -33,8 +32,10 @@ export interface MonthlyLoanReminder {
   dismissKey: string
   due: LoanDueInfo
   dueSummary: string
-  /** Red styling for value limit alerts */
+  /** Red styling for value limit alerts (90%+) */
   isCritical: boolean
+  /** Stronger styling at or over 100% of value limit */
+  isUrgent: boolean
 }
 
 export function getMonthlyReminderPeriod(loan: Loan, asOf: Date = new Date()): number {
@@ -66,6 +67,7 @@ function valueLimitToReminder(alert: LoanValueLimitAlert): MonthlyLoanReminder {
     due,
     dueSummary: formatValueLimitAlertLabel(alert),
     isCritical: true,
+    isUrgent: alert.severity === 'at_limit',
   }
 }
 
@@ -98,6 +100,7 @@ export function getMonthlyLoanReminders(
           due,
           dueSummary: formatDueSummary(due),
           isCritical: false,
+          isUrgent: false,
         }
       }
 
@@ -121,6 +124,7 @@ export function getMonthlyLoanReminders(
         due,
         dueSummary: formatDueSummary(due),
         isCritical: false,
+        isUrgent: false,
       }
     })
     .filter((r): r is MonthlyLoanReminder => r !== null)
@@ -180,6 +184,7 @@ export interface DashboardAttentionItem {
   dismissKey?: string
   dueDateLabel?: string
   isCritical?: boolean
+  isUrgent?: boolean
 }
 
 export function getDashboardAttentionItems(
@@ -201,11 +206,12 @@ export function getDashboardAttentionItems(
       borrowerId: alert.borrowerId,
       borrowerName: name || 'Borrower',
       reason: formatValueLimitAlertLabel(alert),
-      context: `${loan.id} · limit ${formatCurrency(alert.valueLimit)}`,
+      context: loan.id,
       amount: alert.totalDue,
-      amountCaption: 'Principal + interest',
+      amountCaption: '',
       dismissKey: alert.dismissKey,
       isCritical: true,
+      isUrgent: alert.severity === 'at_limit',
     })
   }
 
@@ -229,6 +235,7 @@ export function getDashboardAttentionItems(
       dismissKey: reminder.dismissKey,
       dueDateLabel: reminder.due.dueDateLabel,
       isCritical: false,
+      isUrgent: false,
     })
   }
 
@@ -255,5 +262,12 @@ export function getDashboardAttentionItems(
     payment_due_soon: 2,
     pending_loan: 3,
   }
-  return items.sort((a, b) => kindOrder[a.kind] - kindOrder[b.kind])
+  return items.sort((a, b) => {
+    const byKind = kindOrder[a.kind] - kindOrder[b.kind]
+    if (byKind !== 0) return byKind
+    if (a.kind === 'value_limit' && b.kind === 'value_limit') {
+      if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1
+    }
+    return 0
+  })
 }
