@@ -32,9 +32,13 @@ export function PartnerDetail({ id }: { id: string }) {
     <div className="page detail-page">
       <div className="detail-hero borrower-hero">
         <div className="avatar avatar-lg">{partner.name.charAt(0)}</div>
-        <div>
+        <div className="detail-hero-text">
           <p className="detail-hero-amount">{partner.name}</p>
-          <p className="detail-hero-sub">Rates set per loan on their share</p>
+          <p
+            className={`detail-hero-sub${!partner.phone.trim() ? ' detail-hero-sub--muted' : ''}`}
+          >
+            {formatDisplayPhone(partner.phone)}
+          </p>
         </div>
       </div>
 
@@ -47,15 +51,13 @@ export function PartnerDetail({ id }: { id: string }) {
         <DetailGrid>
           <DetailField label="Partner ID" value={partner.id} />
           <DetailField label="Status" value={partner.status} />
-          <DetailField label="Phone" value={formatDisplayPhone(partner.phone)} />
-          <DetailField label="Partner since" value={partner.startDate} />
           <DetailField label="Notes" value={partner.notes || '—'} full />
         </DetailGrid>
       </DetailSection>
 
       <DetailSection title="Loans">
         {partnerLoans.length === 0 ? (
-          <p className="empty-inline">Not assigned to any loan yet. Add them on a loan form.</p>
+          <p className="empty-inline">No loans</p>
         ) : (
           <div className="link-card-list">
             {partnerLoans.map((loan) => {
@@ -80,7 +82,9 @@ export function PartnerDetail({ id }: { id: string }) {
                     .join(' · ') || '—'}
                   meta={
                     loan.status === 'Active'
-                      ? `${formatCurrency(principalShare)} · ${formatCurrency(loanInterest)} due`
+                      ? share && share.amount <= 0 && loanInterest > 0
+                        ? `${formatCurrency(loanInterest)} int. due`
+                        : `${formatCurrency(principalShare)} · ${formatCurrency(loanInterest)} due`
                       : loan.status
                   }
                   route={{ type: 'loan', id: loan.id }}

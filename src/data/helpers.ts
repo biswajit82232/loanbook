@@ -101,7 +101,10 @@ export function formatDaysLent(days: number | null, loan: Loan): string {
   return `${days} days`
 }
 
-/** Days since last interest payment or since money was lent */
+/**
+ * Calendar days since accrual anchor (last interest payment or lend date).
+ * Running interest uses: outstanding principal × rate × (days ÷ 30 monthly, ÷ 365 yearly).
+ */
 export function getInterestAccrualDays(loan: Loan, asOf: Date = new Date()): number {
   if (loan.status !== 'Active') return 0
   const anchorStr = loan.lastPaymentDate ?? loan.startDate
@@ -112,7 +115,7 @@ export function getInterestAccrualDays(loan: Loan, asOf: Date = new Date()): num
   return Math.max(0, Math.floor((asOfUtc - anchorUtc) / 86400000))
 }
 
-/** Interest from rate × days on outstanding principal (since last payment or lend date) */
+/** Interest from rate × days on outstanding principal since accrual anchor */
 export function calculateBuiltUpInterest(loan: Loan, asOf: Date = new Date()): number {
   if (loan.status !== 'Active' || loan.principalOutstanding <= 0) return 0
 
@@ -154,17 +157,13 @@ export function getBuiltUpInterest(loan: Loan, asOf: Date = new Date()): number 
 export function collapseOutstandingInterestLog(loan: Loan): Loan {
   const log = loan.interestLog ?? []
   const fromLog = sumOutstandingInterestLog({ ...loan, interestLog: log })
-  if (fromLog <= 0) {
-    return { ...loan, interestLog: log.filter((e) => e.status !== 'outstanding' || e.amount > 0) }
-  }
-  const booked = loan.accruedInterest ?? 0
   const paidOnly = log.filter((e) => e.status === 'paid')
-  if (booked > 0) {
+  if (fromLog <= 0) {
     return { ...loan, interestLog: paidOnly }
   }
   return {
     ...loan,
-    accruedInterest: fromLog,
+    accruedInterest: (loan.accruedInterest ?? 0) + fromLog,
     interestLog: paidOnly,
   }
 }
@@ -374,7 +373,8 @@ export function applyPaymentToLoan(loan: Loan, payment: Payment): Loan {
     ...loan,
     accruedInterest: remainingDue,
     interestCollected: loan.interestCollected + payment.interestAmount,
-    lastPaymentDate: remainingDue === 0 ? payment.date : loan.lastPaymentDate,
+    // Always move anchor on interest payment so running accrual does not double-count prior days
+    lastPaymentDate: payment.date,
     interestLog,
   }
 }
@@ -404,58 +404,24 @@ export function reverseInterestFromLog(
   return pruneZeroOutstandingLog(next)
 }
 
-/** Restore loan to state before any of these payments were applied */
-function comparePaymentOrder(a: Payment, b: Payment): number {
+function comparePaymentChronological(a: Payment, b: Payment): number {
   const ta = parseAppDate(a.date)?.getTime() ?? 0
   const tb = parseAppDate(b.date)?.getTime() ?? 0
-  if (tb !== ta) return tb - ta
-  return b.id.localeCompare(a.id)
+  if (ta !== tb) return ta - tb
+  return a.id.localeCompare(b.id)
 }
 
-export function restoreLoanBeforePayments(loan: Loan, allPayments: Payment[]): Loan {
-  let interestCollected = loan.interestCollected
-  let principalOutstanding = loan.principalOutstanding
-  let status = loan.status
-  let accruedInterest = loan.accruedInterest ?? 0
-  let interestLog = (loan.interestLog ?? []).map((e) => ({ ...e }))
-
-  const reverseOrder = [...allPayments].sort(comparePaymentOrder)
-
-  for (const payment of reverseOrder) {
-    if (payment.type === 'full_settlement') {
-      principalOutstanding += payment.principalAmount
-      status = 'Active'
-      interestCollected = Math.max(0, interestCollected - payment.interestAmount)
-      accruedInterest += payment.interestAmount
-      interestLog = interestLog.map((e) => ({
-        ...e,
-        status: 'outstanding' as const,
-        paidOn: undefined,
-      }))
-    } else {
-      interestCollected = Math.max(0, interestCollected - payment.interestAmount)
-      accruedInterest += payment.interestAmount
-      interestLog = reverseInterestFromLog(
-        interestLog,
-        payment.interestAmount,
-        payment.date,
-      )
-    }
-  }
-
-  const interestLogClean = pruneZeroOutstandingLog(interestLog)
-
-  const restored: Loan = collapseOutstandingInterestLog({
+/** Reset loan to terms-only state, then replay payments in date order. */
+export function buildLoanStateForPaymentReplay(loan: Loan): Loan {
+  return {
     ...loan,
-    principalOutstanding,
-    status,
-    interestCollected,
-    interestLog: interestLogClean,
+    principalOutstanding: loan.principal,
+    accruedInterest: 0,
+    interestCollected: 0,
+    interestLog: [],
     lastPaymentDate: undefined,
-    accruedInterest,
-  })
-
-  return restored
+    status: loan.status === 'Closed' ? 'Active' : loan.status,
+  }
 }
 
 export function reversePaymentOnLoan(loan: Loan, payment: Payment): Loan {
@@ -487,20 +453,56 @@ export function reversePaymentOnLoan(loan: Loan, payment: Payment): Loan {
   }
 }
 
-/** Undo all payments on a loan, then re-apply the given set (e.g. after deleting one). */
+/** Rebuild loan balances from principal/terms by replaying payments (e.g. after delete). */
 export function recomputeLoanFromPayments(
   loan: Loan,
   paymentsToApply: Payment[],
-  allPaymentsOnLoan: Payment[],
 ): Loan {
-  let state = restoreLoanBeforePayments(loan, allPaymentsOnLoan)
+  let state = normalizeLoan(buildLoanStateForPaymentReplay(loan))
 
-  const applyOrder = [...paymentsToApply].sort((a, b) => -comparePaymentOrder(a, b))
+  const applyOrder = [...paymentsToApply].sort(comparePaymentChronological)
   for (const p of applyOrder) {
     state = applyPaymentToLoan(state, p)
   }
 
   return normalizeLoan(state)
+}
+
+/** Align loan interest/principal with payment history (fixes legacy bad deletes). */
+export function healLoanWithPayments(loan: Loan, loanPayments: Payment[]): Loan {
+  if (loanPayments.length > 0) {
+    return recomputeLoanFromPayments(loan, loanPayments)
+  }
+  const booked = loan.accruedInterest ?? 0
+  const running = getRunningAccrual(loan)
+  if (booked > 0 && running > 0 && Math.abs(booked - running) <= 1) {
+    return normalizeLoan({
+      ...loan,
+      accruedInterest: 0,
+      interestLog: (loan.interestLog ?? []).filter((e) => e.status === 'paid'),
+    })
+  }
+  return normalizeLoan(loan)
+}
+
+export function healLoanBookData(data: {
+  borrowers: Borrower[]
+  loans: Loan[]
+  payments: Payment[]
+  partners: Partner[]
+}): { borrowers: Borrower[]; loans: Loan[]; payments: Payment[]; partners: Partner[] } {
+  const paymentsByLoan = new Map<string, Payment[]>()
+  for (const p of data.payments) {
+    const list = paymentsByLoan.get(p.loanId) ?? []
+    list.push(p)
+    paymentsByLoan.set(p.loanId, list)
+  }
+  return {
+    ...data,
+    loans: data.loans.map((loan) =>
+      healLoanWithPayments(loan, paymentsByLoan.get(loan.id) ?? []),
+    ),
+  }
 }
 
 export function getBorrowerOutstanding(loans: Loan[], borrowerId: string): number {
@@ -525,21 +527,6 @@ export function getBorrowerLoanCounts(loans: Loan[], borrowerId: string) {
   const borrowerLoans = loans.filter((l) => l.borrowerId === borrowerId)
   const active = borrowerLoans.filter((l) => l.status === 'Active').length
   return { total: borrowerLoans.length, active }
-}
-
-export function getBorrowersPortfolioStats(loans: Loan[], borrowers: Borrower[]) {
-  let totalDue = 0
-  let withBalance = 0
-  for (const b of borrowers) {
-    const due = getBorrowerOutstanding(loans, b.id)
-    totalDue += due
-    if (due > 0) withBalance += 1
-  }
-  return {
-    borrowerCount: borrowers.length,
-    withBalance,
-    totalDue,
-  }
 }
 
 export function getPortfolioStats(loans: Loan[], payments: Payment[]) {
@@ -699,10 +686,10 @@ function migratePartnerShares(loan: Loan): LoanPartnerShare[] {
   const principal = loan.principal ?? 0
   return (loan.partnerShares ?? []).map((raw) => {
     const legacy = raw as LoanPartnerShare & { sharePercent?: number }
-    if (typeof legacy.amount === 'number' && legacy.amount > 0) {
+    if (typeof legacy.amount === 'number' && Number.isFinite(legacy.amount)) {
       return {
         partnerId: legacy.partnerId,
-        amount: legacy.amount,
+        amount: Math.max(0, legacy.amount),
         rate: legacy.rate ?? 0,
         ratePeriod: legacy.ratePeriod ?? 'monthly',
       }
@@ -725,10 +712,25 @@ export function getPartnerShareOnLoan(loan: Loan, partnerId: string): LoanPartne
   return (loan.partnerShares ?? []).find((s) => s.partnerId === partnerId)
 }
 
-/** Outstanding principal attributed to this partner on the loan */
+/** Outstanding principal attributed to this partner on the loan (capital deployed) */
 export function getPartnerDeployedOnLoan(loan: Loan, share: LoanPartnerShare): number {
   if (share.amount <= 0 || loan.principal <= 0) return 0
   return Math.round(share.amount * (loan.principalOutstanding / loan.principal))
+}
+
+/** Principal base for partner interest: share outstanding, or full loan when amount is 0 */
+export function getPartnerInterestPrincipalBase(
+  loan: Loan,
+  share: LoanPartnerShare,
+): number {
+  if (loan.status !== 'Active' || share.rate < 0) return 0
+  if (share.amount > 0 && loan.principal > 0) {
+    return getPartnerDeployedOnLoan(loan, share)
+  }
+  if (share.amount <= 0 && share.rate > 0) {
+    return loan.principalOutstanding
+  }
+  return 0
 }
 
 /** Interest owed on this loan share at the rate set on the loan form */
@@ -737,10 +739,10 @@ export function calculatePartnerInterestOnLoan(
   share: LoanPartnerShare,
   asOf: Date = new Date(),
 ): number {
-  if (loan.status !== 'Active' || share.amount <= 0 || share.rate < 0) return 0
+  if (loan.status !== 'Active' || share.rate < 0) return 0
 
-  const principalShare = getPartnerDeployedOnLoan(loan, share)
-  if (principalShare <= 0) return 0
+  const principalBase = getPartnerInterestPrincipalBase(loan, share)
+  if (principalBase <= 0) return 0
 
   const days = getInterestAccrualDays(loan, asOf)
   if (days <= 0) return 0
@@ -748,8 +750,8 @@ export function calculatePartnerInterestOnLoan(
   const rate = share.rate / 100
   const interest =
     share.ratePeriod === 'monthly'
-      ? principalShare * rate * (days / 30)
-      : principalShare * rate * (days / 365)
+      ? principalBase * rate * (days / 30)
+      : principalBase * rate * (days / 365)
 
   return Math.round(interest)
 }
@@ -827,8 +829,8 @@ export function validatePartnerShares(
     if (ids.has(share.partnerId)) return 'Each partner can only appear once per loan.'
     ids.add(share.partnerId)
 
-    if (!Number.isFinite(share.amount) || share.amount <= 0) {
-      return 'Each partner amount must be greater than zero.'
+    if (!Number.isFinite(share.amount) || share.amount < 0) {
+      return 'Partner amount cannot be negative.'
     }
     if (!Number.isFinite(share.rate) || share.rate < 0) {
       return 'Partner rate cannot be negative.'

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { AccentColor, AppSettings, CurrencyCode, ThemePreference } from '../data/types'
-import { formatCurrency } from '../data/helpers'
 import { normalizeSettings } from '../data/settings'
+import { APP_VERSION } from '../lib/version'
 import { useAuth } from '../context/AuthContext'
 import { useLoanBook } from '../context/LoanBookContext'
 import { isSupabaseConfigured } from '../lib/env'
@@ -92,7 +92,6 @@ export function Settings() {
 
         <section className="settings-section">
           <h2 className="settings-section-title">Loan defaults</h2>
-          <p className="settings-section-desc">Used when creating new loans and partners.</p>
           <label className="field">
             <span className="field-label">Default rate (%)</span>
             <input
@@ -148,25 +147,18 @@ export function Settings() {
             options={CURRENCY_OPTIONS}
             onChange={(value) => patch({ currency: value })}
           />
-          <p className="field-hint settings-preview-hint">
-            Preview: {formatCurrency(125000)}
-          </p>
           <label className="field field--checkbox">
             <input
               type="checkbox"
               checked={form.compactLists}
               onChange={(e) => patch({ compactLists: e.target.checked })}
             />
-            <span>Compact lists (denser rows on loans, payments, borrowers)</span>
+            <span>Compact lists</span>
           </label>
         </section>
 
         <section className="settings-section">
           <h2 className="settings-section-title">Reminders</h2>
-          <p className="settings-section-desc">
-            Dashboard bell alerts when interest is due and this many days have passed since the
-            last payment (or loan start).
-          </p>
           <label className="field">
             <span className="field-label">Reminder period (days)</span>
             <input
@@ -194,12 +186,17 @@ export function Settings() {
       {cloudAccount && user && (
         <section className="settings-section settings-section--account">
           <h2 className="settings-section-title">Account</h2>
-          <p className="settings-section-desc">Signed in as {user.email}</p>
+          <p className="settings-account-email">{user.email}</p>
           <button type="button" className="btn btn-secondary" onClick={() => signOut()}>
             Sign out
           </button>
         </section>
       )}
+
+      <section className="settings-section settings-section--about">
+        <h2 className="settings-section-title">About</h2>
+        <p className="settings-version">Version {APP_VERSION}</p>
+      </section>
     </div>
   )
 }

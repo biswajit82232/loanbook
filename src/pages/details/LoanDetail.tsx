@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   calculatePartnerInterestOnLoan,
   formatCurrency,
@@ -13,6 +14,8 @@ import {
   getPaymentTypeLabel,
 } from '../../data/helpers'
 import { BtnIcon } from '../../components/BtnIcon'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { Icon } from '../../components/icons'
 import { useNavigation } from '../../context/NavigationContext'
 import { useLoanBook } from '../../context/LoanBookContext'
 import { DetailField, DetailGrid, DetailSection } from '../../components/DetailSection'
@@ -20,8 +23,11 @@ import { KpiCard } from '../../components/KpiCard'
 import { LinkCard } from '../../components/LinkCard'
 
 export function LoanDetail({ id }: { id: string }) {
-  const { openPaymentForm, openLoanForm } = useNavigation()
-  const { getLoan, getBorrower, getPartner, getPaymentsByLoan, loans } = useLoanBook()
+  const { openPaymentForm, openLoanForm, goBack } = useNavigation()
+  const { getLoan, getBorrower, getPartner, getPaymentsByLoan, loans, deleteLoan } =
+    useLoanBook()
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const loan = getLoan(id)
 
   if (!loan) {
@@ -30,6 +36,22 @@ export function LoanDetail({ id }: { id: string }) {
 
   const borrower = getBorrower(loan.borrowerId)
   const loanPayments = getPaymentsByLoan(loan.id)
+
+  function openDeleteConfirm() {
+    setDeleteError('')
+    setDeleteOpen(true)
+  }
+
+  function handleConfirmDelete() {
+    const result = deleteLoan(id)
+    if (result.ok) {
+      setDeleteOpen(false)
+      goBack()
+    } else {
+      setDeleteError(result.error)
+    }
+  }
+
   const builtUpInterest = getBuiltUpInterest(loan)
   const totalDue = getLoanTotalDue(loan)
   const isActive = loan.status === 'Active'
@@ -90,7 +112,9 @@ export function LoanDetail({ id }: { id: string }) {
                   subtitle={`${formatCurrency(share.amount)} · ${formatShareRate(share)}`}
                   meta={
                     isActive
-                      ? `${formatCurrency(principalShare)} · ${formatCurrency(partnerInterest)} due`
+                      ? share.amount > 0
+                        ? `${formatCurrency(principalShare)} · ${formatCurrency(partnerInterest)} due`
+                        : `${formatCurrency(partnerInterest)} int. due`
                       : '—'
                   }
                   route={{ type: 'partner', id: partner.id }}
@@ -143,7 +167,7 @@ export function LoanDetail({ id }: { id: string }) {
 
       <DetailSection title="Payments">
         {loanPayments.length === 0 ? (
-          <p className="empty-inline">No payments.</p>
+          <p className="empty-inline">No payments</p>
         ) : (
           <div className="link-card-list">
             {loanPayments.map((p) => (
@@ -185,7 +209,37 @@ export function LoanDetail({ id }: { id: string }) {
         >
           <BtnIcon icon="pencil">Edit loan</BtnIcon>
         </button>
+        <button type="button" className="btn btn-danger" onClick={openDeleteConfirm}>
+          <span className="btn-inner">
+            <Icon name="trash" size={18} className="btn-inner-icon" />
+            <span>Delete loan</span>
+          </span>
+        </button>
       </div>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        title="Delete loan?"
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        error={deleteError}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={handleConfirmDelete}
+      >
+        <div className="modal-summary">
+          <strong>{formatCurrency(loan.principal)}</strong>
+          <span>
+            {loan.id}
+            {borrower ? ` · ${borrower.name}` : ''}
+          </span>
+          {loanPayments.length > 0 && (
+            <span>
+              {loanPayments.length} payment{loanPayments.length === 1 ? '' : 's'} will also be
+              deleted
+            </span>
+          )}
+        </div>
+      </ConfirmDialog>
     </div>
   )
 }

@@ -1,5 +1,4 @@
 import { BtnIcon } from './BtnIcon'
-import { formatCurrency } from '../data/helpers'
 import { Icon } from './icons'
 import type { InterestRatePeriod, LoanPartnerShare, Partner } from '../data/types'
 import { PartnerPicker } from './PartnerPicker'
@@ -31,13 +30,12 @@ export function LoanPartnerSharesEditor({
   partners,
   shares,
   onChange,
-  loanPrincipal,
+  loanPrincipal: _loanPrincipal,
   defaultRate,
   defaultRatePeriod,
   disabled,
 }: LoanPartnerSharesEditorProps) {
   const activePartners = partners.filter((p) => p.status === 'Active')
-  const totalAmount = shares.reduce((s, row) => s + (Number(row.amount) || 0), 0)
 
   function updateRow(index: number, patch: Partial<LoanPartnerShare>) {
     const next = shares.map((row, i) => (i === index ? { ...row, ...patch } : row))
@@ -64,21 +62,13 @@ export function LoanPartnerSharesEditor({
   }
 
   if (activePartners.length === 0) {
-    return (
-      <p className="empty-inline">Add an active partner first to split this loan.</p>
-    )
+    return <p className="empty-inline">No active partners</p>
   }
 
   return (
     <div className="field-group partner-shares-section">
       <div className="field-group-header">
         <span className="field-label">Partners</span>
-        {shares.length > 0 && loanPrincipal > 0 && (
-          <span className="field-hint">
-            {formatCurrency(totalAmount)} of {formatCurrency(loanPrincipal)}
-            {totalAmount > loanPrincipal ? ' (over principal)' : ''}
-          </span>
-        )}
       </div>
 
       {shares.map((row, index) => {
@@ -103,14 +93,13 @@ export function LoanPartnerSharesEditor({
                 <span className="field-label">Amount (₹)</span>
                 <input
                   type="number"
-                  min={1}
+                  min={0}
                   step={1}
-                  value={row.amount || ''}
+                  value={row.amount === 0 ? 0 : row.amount || ''}
                   onChange={(e) =>
                     updateRow(index, { amount: Number(e.target.value) || 0 })
                   }
                   disabled={disabled}
-                  required={!!row.partnerId}
                 />
               </label>
 

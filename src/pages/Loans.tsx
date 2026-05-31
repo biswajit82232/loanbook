@@ -22,7 +22,7 @@ export function Loans() {
       </div>
 
       {loans.length === 0 ? (
-        <p className="empty-inline">No loans yet.</p>
+        <p className="empty-inline">No loans</p>
       ) : (
         <ul className="compact-list">
           {loans.map((loan) => {

@@ -20,7 +20,7 @@ export function Payments() {
       </div>
 
       {sortedPayments.length === 0 ? (
-        <p className="empty-inline">No payments yet.</p>
+        <p className="empty-inline">No payments</p>
       ) : (
         <ul className="compact-list">
           {sortedPayments.map((p) => {

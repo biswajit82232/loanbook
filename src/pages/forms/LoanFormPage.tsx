@@ -96,13 +96,13 @@ export function LoanFormPage({ mode, loanId, borrowerId: presetBorrowerId }: Loa
     const interestChanged =
       isEdit && existing && interestNum !== undefined && interestNum !== currentInterest
 
-    const filledShares = partnerShares.filter((s) => s.partnerId || s.amount > 0)
+    const filledShares = partnerShares.filter((s) => s.partnerId)
     const shareErr = validatePartnerShares(filledShares, partners, principalNum)
     if (shareErr) {
       setError(shareErr)
       return
     }
-    const validShares = partnerShares.filter((s) => s.partnerId && s.amount > 0)
+    const validShares = partnerShares.filter((s) => s.partnerId)
 
     if (!Number.isFinite(principalNum) || principalNum <= 0) {
       setError('Principal must be greater than zero.')
@@ -149,7 +149,7 @@ export function LoanFormPage({ mode, loanId, borrowerId: presetBorrowerId }: Loa
   if (borrowers.length === 0 && !isEdit) {
     return (
       <div className="page form-page">
-        <p className="empty-inline">Add a borrower first.</p>
+        <p className="empty-inline">No borrowers</p>
         <div className="form-page-actions">
           <button type="button" className="btn btn-secondary" onClick={goBack}>
             Back

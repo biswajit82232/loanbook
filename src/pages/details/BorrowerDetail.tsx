@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   formatCurrency,
   formatDaysLent,
@@ -8,17 +9,14 @@ import {
   getLoanListAmountLabel,
   getPaymentTypeLabel,
 } from '../../data/helpers'
-import { BorrowerContactButtons } from '../../components/BorrowerContactButtons'
 import { BtnIcon } from '../../components/BtnIcon'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { Icon } from '../../components/icons'
 import { useNavigation } from '../../context/NavigationContext'
 import { useLoanBook } from '../../context/LoanBookContext'
 import { DetailField, DetailGrid, DetailSection } from '../../components/DetailSection'
 import { KpiCard } from '../../components/KpiCard'
 import { LinkCard } from '../../components/LinkCard'
-import {
-  buildBorrowerReminderMessage,
-  openWhatsApp,
-} from '../../utils/whatsapp'
 import { formatDisplayPhone } from '../../utils/phone'
 
 export function BorrowerDetail({ id }: { id: string }) {
@@ -27,9 +25,11 @@ export function BorrowerDetail({ id }: { id: string }) {
     getLoansByBorrower,
     getPaymentsByBorrower,
     loans,
-    settings,
+    deleteBorrower,
   } = useLoanBook()
-  const { openLoanForm, openBorrowerForm, openPaymentForm } = useNavigation()
+  const { openLoanForm, openBorrowerForm, openPaymentForm, goBack } = useNavigation()
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const borrower = getBorrower(id)
 
   if (!borrower) {
@@ -41,14 +41,18 @@ export function BorrowerDetail({ id }: { id: string }) {
   const borrowerPayments = getPaymentsByBorrower(person.id)
   const totalDue = getBorrowerOutstanding(loans, person.id)
 
-  function sendBorrowerWhatsApp() {
-    const message = buildBorrowerReminderMessage(
-      person,
-      borrowerLoans,
-      settings.businessName,
-    )
-    if (!openWhatsApp(person.phone, message)) {
-      window.alert('Could not open WhatsApp. Check the phone number.')
+  function openDeleteConfirm() {
+    setDeleteError('')
+    setDeleteOpen(true)
+  }
+
+  function handleConfirmDelete() {
+    const result = deleteBorrower(id)
+    if (result.ok) {
+      setDeleteOpen(false)
+      goBack()
+    } else {
+      setDeleteError(result.error)
     }
   }
 
@@ -64,11 +68,6 @@ export function BorrowerDetail({ id }: { id: string }) {
             {formatDisplayPhone(person.phone)}
           </p>
         </div>
-        <BorrowerContactButtons
-          className="detail-hero-contact"
-          phone={person.phone}
-          onWhatsApp={sendBorrowerWhatsApp}
-        />
       </div>
 
       <section className="kpi-grid kpi-grid--3">
@@ -108,7 +107,7 @@ export function BorrowerDetail({ id }: { id: string }) {
 
       <DetailSection title="Payments">
         {borrowerPayments.length === 0 ? (
-          <p className="empty-inline">No payments.</p>
+          <p className="empty-inline">No payments</p>
         ) : (
           <div className="link-card-list">
             {borrowerPayments.map((p) => (
@@ -142,7 +141,39 @@ export function BorrowerDetail({ id }: { id: string }) {
         <button type="button" className="btn btn-secondary" onClick={() => openPaymentForm()}>
           <BtnIcon icon="wallet">Record payment</BtnIcon>
         </button>
+        <button type="button" className="btn btn-danger" onClick={openDeleteConfirm}>
+          <span className="btn-inner">
+            <Icon name="trash" size={18} className="btn-inner-icon" />
+            <span>Delete borrower</span>
+          </span>
+        </button>
       </div>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        title="Delete borrower?"
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        error={deleteError}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={handleConfirmDelete}
+      >
+        <div className="modal-summary">
+          <strong>{person.name}</strong>
+          <span>{person.id}</span>
+          {borrowerLoans.length > 0 && (
+            <span>
+              {borrowerLoans.length} loan{borrowerLoans.length === 1 ? '' : 's'} will be deleted
+            </span>
+          )}
+          {borrowerPayments.length > 0 && (
+            <span>
+              {borrowerPayments.length} payment
+              {borrowerPayments.length === 1 ? '' : 's'} will be deleted
+            </span>
+          )}
+        </div>
+      </ConfirmDialog>
     </div>
   )
 }

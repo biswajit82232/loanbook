@@ -29,7 +29,7 @@ export function Sidebar({
       />
       <aside className={`sidebar ${isOpen ? 'open' : ''}`} aria-label="Main navigation">
         <div className="sidebar-brand">
-          <img src="/favicon.svg" alt="" width={36} height={36} />
+          <img src="/icon-192.png" alt="" width={36} height={36} className="sidebar-brand-logo" />
           <div className="brand-text">
             <span className="brand-name">{displayName}</span>
             <span className="brand-tagline">Loan management</span>

@@ -1,14 +1,12 @@
 import { useMemo, useState } from 'react'
 import { BtnIcon } from '../components/BtnIcon'
 import { Icon } from '../components/icons'
-import { KpiCard } from '../components/KpiCard'
 import {
   formatCurrency,
   getBorrowerInterestDue,
   getBorrowerLoanCounts,
   getBorrowerOutstanding,
   getBorrowerPrincipalDue,
-  getBorrowersPortfolioStats,
 } from '../data/helpers'
 import { useNavigation } from '../context/NavigationContext'
 import { useLoanBook } from '../context/LoanBookContext'
@@ -35,11 +33,6 @@ export function Borrowers() {
   const { openDetail, openBorrowerForm } = useNavigation()
   const { borrowers, loans } = useLoanBook()
   const [search, setSearch] = useState('')
-
-  const stats = useMemo(
-    () => getBorrowersPortfolioStats(loans, borrowers),
-    [loans, borrowers],
-  )
 
   const sortedBorrowers = useMemo(() => {
     return [...borrowers].sort((a, b) => {
@@ -71,18 +64,6 @@ export function Borrowers() {
       </div>
 
       {borrowers.length > 0 && (
-        <section className="kpi-grid kpi-grid--3">
-          <KpiCard label="Borrowers" value={stats.borrowerCount} />
-          <KpiCard label="With balance" value={stats.withBalance} variant="accent" />
-          <KpiCard
-            label="Total due"
-            value={formatCurrency(stats.totalDue)}
-            variant="interest"
-          />
-        </section>
-      )}
-
-      {borrowers.length > 0 && (
         <label className="list-search field">
           <span className="visually-hidden">Search borrowers</span>
           <span className="list-search-icon" aria-hidden>
@@ -110,9 +91,9 @@ export function Borrowers() {
       )}
 
       {borrowers.length === 0 ? (
-        <p className="empty-inline">No borrowers yet. Add someone you lend to.</p>
+        <p className="empty-inline">No borrowers</p>
       ) : visibleBorrowers.length === 0 ? (
-        <p className="empty-inline">No borrowers match your search.</p>
+        <p className="empty-inline">No results</p>
       ) : (
         <ul className="compact-list">
           {visibleBorrowers.map((b) => {

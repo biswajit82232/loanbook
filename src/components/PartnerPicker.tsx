@@ -85,7 +85,6 @@ export function PartnerPicker({
         onFocus={() => !disabled && setOpen(true)}
         onBlur={handleBlur}
         disabled={disabled}
-        placeholder="Type to search…"
         autoComplete="off"
       />
       {open && !disabled && filtered.length > 0 && (

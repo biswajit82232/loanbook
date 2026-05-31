@@ -1,7 +1,5 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { Icon } from '../components/icons'
-
 export function Login() {
   const { signIn, allowedEmailHint, isConfigured } = useAuth()
   const [email, setEmail] = useState(allowedEmailHint ?? '')
@@ -23,11 +21,7 @@ export function Login() {
       <div className="auth-screen">
         <div className="auth-card">
           <h1>LoanBook</h1>
-          <p className="auth-message">
-            Supabase environment variables are missing. Add{' '}
-            <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> for
-            deployment, or run locally without them to use browser storage.
-          </p>
+          <p className="auth-message">Supabase env vars not configured.</p>
         </div>
       </div>
     )
@@ -37,9 +31,8 @@ export function Login() {
     <div className="auth-screen">
       <div className="auth-card">
         <div className="auth-brand">
-          <img src="/favicon.svg" alt="" width={48} height={48} />
+          <img src="/icon-192.png" alt="" width={64} height={64} className="auth-brand-logo" />
           <h1>LoanBook</h1>
-          <p>Sign in to manage your loans</p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
@@ -64,20 +57,12 @@ export function Login() {
             />
           </label>
 
-          {allowedEmailHint && (
-            <p className="field-hint">Only {allowedEmailHint} can access this app.</p>
-          )}
-
           {error && <p className="form-error">{error}</p>}
 
           <button type="submit" className="btn btn-primary auth-submit" disabled={submitting}>
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-
-        <p className="auth-footnote">
-          <Icon name="landmark" size={16} /> Private lending — single account
-        </p>
       </div>
     </div>
   )

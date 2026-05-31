@@ -68,7 +68,6 @@ export function BorrowerFormPage({ mode, borrowerId }: BorrowerFormPageProps) {
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="+91 98765 43210"
             autoComplete="tel"
           />
         </label>

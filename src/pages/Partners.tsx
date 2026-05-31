@@ -38,7 +38,7 @@ export function Partners() {
       </section>
 
       {partners.length === 0 ? (
-        <p className="empty-inline">No partners yet. Add someone who funds your loans.</p>
+        <p className="empty-inline">No partners</p>
       ) : (
         <ul className="compact-list">
           {partners.map((partner) => {
@@ -61,7 +61,7 @@ export function Partners() {
                   <div className="compact-row-mid">
                     <span className="compact-row-name">{formatDisplayPhone(partner.phone)}</span>
                     <span className="compact-row-dot">·</span>
-                    <span className="compact-row-days">since {partner.startDate}</span>
+                    <span className="compact-row-days">{partner.id}</span>
                   </div>
                   <div className="compact-row-bottom">
                     <span>{formatCurrency(deployed)} deployed</span>

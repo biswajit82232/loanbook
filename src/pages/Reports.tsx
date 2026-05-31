@@ -19,7 +19,7 @@ export function Reports() {
       <section className="panel">
         <h2>By month</h2>
         {monthlySummaries.length === 0 ? (
-          <p className="empty-inline">No payments recorded yet.</p>
+          <p className="empty-inline">No payments</p>
         ) : (
           <div className="link-card-list">
             {monthlySummaries.map((m) => (

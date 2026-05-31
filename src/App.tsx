@@ -46,7 +46,7 @@ function AppMain() {
   if (dataLoading || !dataReady) {
     return (
       <div className="app-loading">
-        <p>Loading your loan book…</p>
+        <p>Loading…</p>
       </div>
     )
   }

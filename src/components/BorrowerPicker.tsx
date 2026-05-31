@@ -79,7 +79,6 @@ export function BorrowerPicker({
         }}
         onFocus={() => !disabled && setOpen(true)}
         onBlur={handleBlur}
-        placeholder="Type borrower name…"
         autoComplete="off"
         disabled={disabled}
         aria-autocomplete="list"

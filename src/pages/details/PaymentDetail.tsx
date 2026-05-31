@@ -103,7 +103,6 @@ export function PaymentDetail({ id }: { id: string }) {
       <ConfirmDialog
         open={deleteOpen}
         title="Delete payment?"
-        message="This will remove the payment and update the linked loan balances."
         confirmLabel="Delete"
         cancelLabel="Keep"
         error={deleteError}

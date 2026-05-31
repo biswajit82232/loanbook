@@ -78,9 +78,6 @@ export function PartnerFormPage({ mode, partnerId }: PartnerFormPageProps) {
   return (
     <div className="page form-page">
       <form className="form form-page-form" onSubmit={handleSubmit}>
-        <p className="field-hint field-hint--block">
-          Interest on a partner&apos;s share is set on each loan when you add them to that loan.
-        </p>
         <label className="field">
           <span className="field-label">Name</span>
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -93,7 +90,6 @@ export function PartnerFormPage({ mode, partnerId }: PartnerFormPageProps) {
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="+91 98765 43210"
             autoComplete="tel"
           />
         </label>

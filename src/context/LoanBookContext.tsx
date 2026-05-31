@@ -29,6 +29,7 @@ import {
   applyPaymentToLoan,
   buildInitialInterestLog,
   buildPaymentAmounts,
+  healLoanBookData,
   recomputeLoanFromPayments,
   formatDisplayDate,
   getMonthlySummaries,
@@ -83,6 +84,8 @@ interface LoanBookContextValue {
     input: RecordPaymentInput,
   ) => { ok: true; paymentId: string } | { ok: false; error: string }
   deletePayment: (paymentId: string) => { ok: true } | { ok: false; error: string }
+  deleteLoan: (loanId: string) => { ok: true } | { ok: false; error: string }
+  deleteBorrower: (borrowerId: string) => { ok: true } | { ok: false; error: string }
   createLoan: (
     input: CreateLoanInput,
   ) => { ok: true; loanId: string } | { ok: false; error: string }
@@ -156,11 +159,25 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       fetchLoanBook(userId)
         .then(({ data, settings: loaded }) => {
           if (cancelled) return
-          setBorrowers(data.borrowers)
-          setLoans(data.loans.map(normalizeLoan))
-          setPayments(data.payments)
-          setPartners(data.partners)
+          const healed = healLoanBookData(data)
+          setBorrowers(healed.borrowers)
+          setLoans(healed.loans)
+          setPayments(healed.payments)
+          setPartners(healed.partners)
           setSettings(loaded)
+          const loansChanged = healed.loans.some((loan) => {
+            const raw = data.loans.find((l) => l.id === loan.id)
+            if (!raw) return true
+            return (
+              (raw.accruedInterest ?? 0) !== (loan.accruedInterest ?? 0) ||
+              raw.principalOutstanding !== loan.principalOutstanding ||
+              raw.lastPaymentDate !== loan.lastPaymentDate ||
+              raw.status !== loan.status
+            )
+          })
+          if (loansChanged) {
+            void syncLoanBook(userId, healed, loaded)
+          }
           setDataReady(true)
         })
         .catch((err: Error) => {
@@ -177,10 +194,16 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
 
     if (!useCloud) {
       const stored = loadStoredData()
-      setBorrowers((stored?.borrowers ?? seedBorrowers).map(normalizeBorrower))
-      setLoans((stored?.loans ?? seedLoans).map(normalizeLoan))
-      setPayments(stored?.payments ?? seedPayments)
-      setPartners((stored?.partners ?? seedPartners).map(normalizePartner))
+      const book = healLoanBookData({
+        borrowers: (stored?.borrowers ?? seedBorrowers).map(normalizeBorrower),
+        loans: (stored?.loans ?? seedLoans).map(normalizeLoan),
+        payments: stored?.payments ?? seedPayments,
+        partners: (stored?.partners ?? seedPartners).map(normalizePartner),
+      })
+      setBorrowers(book.borrowers)
+      setLoans(book.loans)
+      setPayments(book.payments)
+      setPartners(book.partners)
       setSettings(loadSettings())
       setDataReady(true)
       setDataLoading(false)
@@ -574,7 +597,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
 
       const allForLoan = payments.filter((p) => p.loanId === loan.id)
       const remaining = allForLoan.filter((p) => p.id !== paymentId)
-      const updatedLoan = recomputeLoanFromPayments(loan, remaining, allForLoan)
+      const updatedLoan = recomputeLoanFromPayments(loan, remaining)
 
       persist({
         borrowers,
@@ -583,6 +606,58 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
         partners,
       })
       setToast(`Payment ${paymentId} deleted`)
+      return { ok: true }
+    },
+    [borrowers, loans, payments, partners, persist],
+  )
+
+  const deleteLoan = useCallback(
+    (loanId: string): { ok: true } | { ok: false; error: string } => {
+      const loan = loans.find((l) => l.id === loanId)
+      if (!loan) return { ok: false, error: 'Loan not found.' }
+
+      const removedPayments = payments.filter((p) => p.loanId === loanId).length
+      persist({
+        borrowers,
+        loans: loans.filter((l) => l.id !== loanId),
+        payments: payments.filter((p) => p.loanId !== loanId),
+        partners,
+      })
+      setToast(
+        removedPayments > 0
+          ? `Loan ${loanId} and ${removedPayments} payment${removedPayments === 1 ? '' : 's'} deleted`
+          : `Loan ${loanId} deleted`,
+      )
+      return { ok: true }
+    },
+    [borrowers, loans, payments, partners, persist],
+  )
+
+  const deleteBorrower = useCallback(
+    (borrowerId: string): { ok: true } | { ok: false; error: string } => {
+      const borrower = borrowers.find((b) => b.id === borrowerId)
+      if (!borrower) return { ok: false, error: 'Borrower not found.' }
+
+      const removedLoans = loans.filter((l) => l.borrowerId === borrowerId).length
+      const removedPayments = payments.filter((p) => p.borrowerId === borrowerId).length
+      persist({
+        borrowers: borrowers.filter((b) => b.id !== borrowerId),
+        loans: loans.filter((l) => l.borrowerId !== borrowerId),
+        payments: payments.filter((p) => p.borrowerId !== borrowerId),
+        partners,
+      })
+      const parts: string[] = [`${borrower.name} deleted`]
+      if (removedLoans > 0) {
+        parts.push(
+          `${removedLoans} loan${removedLoans === 1 ? '' : 's'}`,
+        )
+      }
+      if (removedPayments > 0) {
+        parts.push(
+          `${removedPayments} payment${removedPayments === 1 ? '' : 's'}`,
+        )
+      }
+      setToast(parts.length > 1 ? `${parts[0]} — ${parts.slice(1).join(', ')}` : parts[0])
       return { ok: true }
     },
     [borrowers, loans, payments, partners, persist],
@@ -610,6 +685,8 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       getPaymentsByBorrower,
       recordPayment,
       deletePayment,
+      deleteLoan,
+      deleteBorrower,
       createLoan,
       updateLoan,
       createBorrower,
@@ -640,6 +717,8 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       getPaymentsByBorrower,
       recordPayment,
       deletePayment,
+      deleteLoan,
+      deleteBorrower,
       createLoan,
       updateLoan,
       createBorrower,

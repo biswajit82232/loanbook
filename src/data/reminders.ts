@@ -70,3 +70,68 @@ export function formatReminderPeriodLabel(reminder: MonthlyLoanReminder): string
 export function getAnchorLabel(loan: Loan): string {
   return loan.lastPaymentDate ? `Last payment: ${loan.lastPaymentDate}` : `Lent on: ${loan.startDate}`
 }
+
+export type DashboardAttentionKind = 'payment_due' | 'pending_loan'
+
+export interface DashboardAttentionItem {
+  id: string
+  kind: DashboardAttentionKind
+  loanId: string
+  borrowerId: string
+  borrowerName: string
+  reason: string
+  context: string
+  amount: number
+  amountCaption: string
+  dismissKey?: string
+}
+
+export function getDashboardAttentionItems(
+  loans: Loan[],
+  dismissed: Set<string>,
+  getBorrowerName: (borrowerId: string) => string,
+  asOf: Date = new Date(),
+): DashboardAttentionItem[] {
+  const items: DashboardAttentionItem[] = []
+
+  for (const reminder of getMonthlyLoanReminders(loans, dismissed, asOf)) {
+    const name = getBorrowerName(reminder.borrowerId)
+    const loan = reminder.loan
+    const context = loan.lastPaymentDate
+      ? `Last payment ${loan.lastPaymentDate}`
+      : `Disbursed ${loan.startDate}`
+    items.push({
+      id: `reminder-${reminder.dismissKey}`,
+      kind: 'payment_due',
+      loanId: loan.id,
+      borrowerId: reminder.borrowerId,
+      borrowerName: name || 'Borrower',
+      reason: formatReminderPeriodLabel(reminder),
+      context: `${context} · ${loan.id}`,
+      amount: reminder.interestDue,
+      amountCaption: 'Interest due',
+      dismissKey: reminder.dismissKey,
+    })
+  }
+
+  for (const loan of loans.filter((l) => l.status === 'Pending')) {
+    const name = getBorrowerName(loan.borrowerId)
+    items.push({
+      id: `pending-${loan.id}`,
+      kind: 'pending_loan',
+      loanId: loan.id,
+      borrowerId: loan.borrowerId,
+      borrowerName: name || 'Borrower',
+      reason: 'Awaiting disbursement',
+      context: `${loan.id} · Scheduled ${loan.startDate}`,
+      amount: loan.principal,
+      amountCaption: 'Principal',
+    })
+  }
+
+  const kindOrder: Record<DashboardAttentionKind, number> = {
+    payment_due: 0,
+    pending_loan: 1,
+  }
+  return items.sort((a, b) => kindOrder[a.kind] - kindOrder[b.kind])
+}

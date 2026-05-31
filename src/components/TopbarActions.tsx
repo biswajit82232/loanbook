@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { BorrowerContactButtons } from './BorrowerContactButtons'
 import { useLoanBook } from '../context/LoanBookContext'
 import { useNavigation } from '../context/NavigationContext'
-import { getReminderPeriodDays } from '../data/formatPrefs'
 import {
   formatReminderPeriodLabel,
   getAnchorLabel,
@@ -28,7 +27,6 @@ export function TopbarActions() {
     [settings.reminderDismissed],
   )
   const reminders = getMonthlyLoanReminders(loans, dismissed)
-  const reminderDays = getReminderPeriodDays()
   const showNotifications = page === 'dashboard' && !detail
 
   const loanDetail = detail?.type === 'loan' ? detail.id : undefined
@@ -114,11 +112,10 @@ export function TopbarActions() {
           {notifyOpen && (
             <div className="topbar-notify-panel" role="dialog" aria-label="Monthly loan reminders">
               <div className="topbar-notify-header">
-                <strong>Monthly reminders</strong>
-                <span className="field-hint">{reminderDays}+ days since last payment</span>
+                <strong>Reminders</strong>
               </div>
               {reminders.length === 0 ? (
-                <p className="topbar-notify-empty">No loans due for a monthly reminder.</p>
+                <p className="topbar-notify-empty">None</p>
               ) : (
                 <ul className="topbar-notify-list">
                   {reminders.map((r) => {

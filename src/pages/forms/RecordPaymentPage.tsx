@@ -133,7 +133,7 @@ export function RecordPaymentPage({ loanId: initialLoanId, paymentType: initialT
   if (activeLoans.length === 0) {
     return (
       <div className="page form-page">
-        <p className="empty-inline">No active loans.</p>
+        <p className="empty-inline">No active loans</p>
         <button type="button" className="btn btn-secondary" onClick={goBack}>
           Back
         </button>
@@ -145,7 +145,7 @@ export function RecordPaymentPage({ loanId: initialLoanId, paymentType: initialT
     <div className="page form-page">
       <form className="form form-page-form" onSubmit={handleSubmit}>
         {inactiveInitialLoan && (
-          <p className="form-error">That loan is closed or not active. Pick another loan.</p>
+          <p className="form-error">Loan not active</p>
         )}
 
         <LoanPicker

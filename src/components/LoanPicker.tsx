@@ -84,7 +84,6 @@ export function LoanPicker({
         }}
         onFocus={() => setOpen(true)}
         onBlur={handleBlur}
-        placeholder="Type borrower or loan ID…"
         autoComplete="off"
         required={required}
         aria-autocomplete="list"
