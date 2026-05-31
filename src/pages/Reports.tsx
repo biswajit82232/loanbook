@@ -13,7 +13,11 @@ export function Reports() {
     <div className="page">
       <section className="kpi-grid kpi-grid--2">
         <KpiCard label="Principal outstanding" value={formatCurrency(stats.principalDue)} variant="accent" />
-        <KpiCard label="Interest due" value={formatCurrency(stats.interestDue)} variant="interest" />
+        <KpiCard
+          label="Borrower interest"
+          value={formatCurrency(stats.interestDue)}
+          variant="interest"
+        />
       </section>
 
       <section className="panel">

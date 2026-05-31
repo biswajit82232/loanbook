@@ -742,6 +742,32 @@ export function getPartnerInterestPrincipalBase(
   return loan.principalOutstanding
 }
 
+function getRatedPartnerSharesOnLoan(loan: Loan): LoanPartnerShare[] {
+  const principal = loan.principal ?? 0
+  return (loan.partnerShares ?? [])
+    .map((raw) =>
+      normalizePartnerShare(raw as LoanPartnerShare & { sharePercent?: number }, principal),
+    )
+    .filter((s) => s.rate > 0)
+}
+
+/** Booked borrower interest (accruedInterest) split across partners by their rates on the loan */
+export function getPartnerBookedInterestOnLoan(loan: Loan, share: LoanPartnerShare): number {
+  const booked = loan.accruedInterest ?? 0
+  if (booked <= 0 || loan.status !== 'Active') return 0
+
+  const rated = getRatedPartnerSharesOnLoan(loan)
+  if (!rated.length) return 0
+
+  const normalized = normalizePartnerShare(share, loan.principal ?? 0)
+  if (normalized.rate <= 0) return 0
+
+  const totalRate = rated.reduce((s, sh) => s + sh.rate, 0)
+  if (totalRate <= 0) return 0
+
+  return Math.round(booked * (normalized.rate / totalRate))
+}
+
 /** Interest owed on this loan share at the rate set on the loan form */
 export function calculatePartnerInterestOnLoan(
   loan: Loan,
@@ -753,19 +779,21 @@ export function calculatePartnerInterestOnLoan(
   const normalized = normalizePartnerShare(share, loan.principal ?? 0)
   if (normalized.rate <= 0) return 0
 
+  const booked = getPartnerBookedInterestOnLoan(loan, normalized)
+
   const principalBase = getPartnerInterestPrincipalBase(loan, normalized)
-  if (principalBase <= 0) return 0
+  if (principalBase <= 0) return booked
 
   const days = getInterestAccrualDays(loan, asOf)
-  if (days <= 0) return 0
+  if (days <= 0) return booked
 
   const rate = normalized.rate / 100
-  const interest =
+  const running =
     normalized.ratePeriod === 'monthly'
       ? principalBase * rate * (days / 30)
       : principalBase * rate * (days / 365)
 
-  return Math.round(interest)
+  return booked + Math.round(running)
 }
 
 export function getPartnerInterestDue(

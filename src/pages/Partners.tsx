@@ -31,7 +31,7 @@ export function Partners() {
         <KpiCard label="Active partners" value={stats.activePartners} />
         <KpiCard label="Deployed" value={formatCurrency(stats.totalDeployed)} variant="accent" />
         <KpiCard
-          label="Interest due"
+          label="Partner interest"
           value={formatCurrency(stats.totalInterestDue)}
           variant="interest"
         />

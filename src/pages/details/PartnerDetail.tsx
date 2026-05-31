@@ -45,7 +45,7 @@ export function PartnerDetail({ id }: { id: string }) {
 
       <section className="kpi-grid kpi-grid--2">
         <KpiCard label="Principal deployed" value={formatCurrency(deployed)} variant="accent" />
-        <KpiCard label="Interest due" value={formatCurrency(interestDue)} variant="interest" />
+        <KpiCard label="Partner interest" value={formatCurrency(interestDue)} variant="interest" />
       </section>
 
       <DetailSection title="Details">
