@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, type ReactNode } from 'react'
-import { getLoansForPartner } from '../data/helpers'
+import { countOpenLoans, getLoansForPartner } from '../data/helpers'
 import { CountBadge } from './CountBadge'
 import { SafeText } from './SafeText'
 import { Icon } from './icons'
@@ -21,20 +21,18 @@ export function Layout({ children }: { children: ReactNode }) {
   const { page, title, canGoBack, detail, setPage, goBack } = useNavigation()
   const viewKey = getNavigationViewKey(page, detail)
   const showSyncDot = isSupabaseConfigured() && Boolean(user)
-  const loanCount = loans.length
-
   const topbarLoanCount = useMemo(() => {
     if (!detail) {
-      return page === 'loans' ? loanCount : undefined
+      return page === 'loans' ? countOpenLoans(loans) : undefined
     }
     if (detail.type === 'borrower') {
-      return loans.filter((l) => l.borrowerId === detail.id).length
+      return countOpenLoans(loans.filter((l) => l.borrowerId === detail.id))
     }
     if (detail.type === 'partner') {
-      return getLoansForPartner(detail.id, loans).length
+      return countOpenLoans(getLoansForPartner(detail.id, loans))
     }
     return undefined
-  }, [detail, page, loans, loanCount])
+  }, [detail, page, loans])
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {

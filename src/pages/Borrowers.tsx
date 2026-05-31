@@ -9,6 +9,7 @@ import {
   compareBorrowerByLastEdited,
   formatCurrency,
   getBorrowerInterestDue,
+  countOpenLoans,
   getBorrowerLoanCounts,
   getBorrowerOutstanding,
   getBorrowerPrincipalDue,
@@ -59,7 +60,10 @@ function BorrowerPaginatedList({
       />
       <ul className="compact-list">
         {pagination.pageItems.map((b) => {
-          const { total: loanCount, active: activeLoans } = getBorrowerLoanCounts(loans, b.id)
+          const { active: activeLoans, total: allLoans } = getBorrowerLoanCounts(loans, b.id)
+          const badgeLoanCount = countOpenLoans(
+            loans.filter((l) => l.borrowerId === b.id),
+          )
           const totalDue = getBorrowerOutstanding(loans, b.id)
           const principalDue = getBorrowerPrincipalDue(loans, b.id)
           const interestDue = getBorrowerInterestDue(loans, b.id)
@@ -80,10 +84,10 @@ function BorrowerPaginatedList({
                       <SafeText as="span" className="compact-row-id">
                         {b.name}
                       </SafeText>
-                      {loanCount > 0 && (
+                      {badgeLoanCount > 0 && (
                         <CountBadge
-                          count={loanCount}
-                          label={`${loanCount} loan${loanCount === 1 ? '' : 's'}`}
+                          count={badgeLoanCount}
+                          label={`${badgeLoanCount} loan${badgeLoanCount === 1 ? '' : 's'}`}
                         />
                       )}
                     </span>
@@ -91,7 +95,7 @@ function BorrowerPaginatedList({
                       <span className="badge badge-due">Due</span>
                     ) : activeLoans > 0 ? (
                       <span className="badge badge-active">Active</span>
-                    ) : loanCount > 0 ? (
+                    ) : allLoans > 0 ? (
                       <span className="badge badge-closed">Clear</span>
                     ) : (
                       <span className="badge badge-pending">No loans</span>

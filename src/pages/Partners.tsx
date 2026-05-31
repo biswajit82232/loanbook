@@ -5,6 +5,7 @@ import { usePagination } from '../hooks/usePagination'
 import { SafeText } from '../components/SafeText'
 import {
   formatCurrency,
+  countOpenLoans,
   getLoansForPartner,
   getPartnerInterestDue,
   getPartnerPortfolioStats,
@@ -65,7 +66,7 @@ export function Partners() {
             {pagination.pageItems.map((partner) => {
             const deployed = getPartnerPrincipalDeployed(partner.id, loans)
             const interestDue = getPartnerInterestDue(partner.id, loans)
-            const partnerLoanCount = getLoansForPartner(partner.id, loans).length
+            const partnerLoanCount = countOpenLoans(getLoansForPartner(partner.id, loans))
 
             return (
               <li key={partner.id}>

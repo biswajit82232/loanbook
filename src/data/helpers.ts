@@ -78,6 +78,25 @@ export function compareLoanByStartDateNewest(a: Loan, b: Loan): number {
   return b.id.localeCompare(a.id)
 }
 
+/** Active and pending first; closed loans at the bottom (newest start date within each group). */
+export function compareLoanWithClosedLast(a: Loan, b: Loan): number {
+  const rank = (status: Loan['status']) =>
+    status === 'Closed' ? 2 : status === 'Pending' ? 1 : 0
+  const ra = rank(a.status)
+  const rb = rank(b.status)
+  if (ra !== rb) return ra - rb
+  return compareLoanByStartDateNewest(a, b)
+}
+
+export function isOpenLoan(loan: Loan): boolean {
+  return loan.status !== 'Closed'
+}
+
+/** Loan count for list/topbar badges (excludes closed). */
+export function countOpenLoans(loans: readonly Loan[]): number {
+  return loans.filter(isOpenLoan).length
+}
+
 export function getPaymentTypeLabel(type: PaymentType): string {
   return type === 'interest_only' ? 'Interest only' : 'Full settlement'
 }
@@ -663,7 +682,8 @@ export function planBorrowerInterestPayment(
 export function getBorrowerLoanCounts(loans: Loan[], borrowerId: string) {
   const borrowerLoans = loans.filter((l) => l.borrowerId === borrowerId)
   const active = borrowerLoans.filter((l) => l.status === 'Active').length
-  return { total: borrowerLoans.length, active }
+  const open = countOpenLoans(borrowerLoans)
+  return { total: borrowerLoans.length, active, open }
 }
 
 export function getPortfolioStats(loans: Loan[], payments: Payment[]) {

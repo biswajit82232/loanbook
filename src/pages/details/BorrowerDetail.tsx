@@ -8,6 +8,7 @@ import {
   getLoanLentDays,
   getLoanListAmountLabel,
   getPaymentTypeLabel,
+  isOpenLoan,
 } from '../../data/helpers'
 import { BtnIcon } from '../../components/BtnIcon'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -38,7 +39,8 @@ export function BorrowerDetail({ id }: { id: string }) {
   }
 
   const person = borrower
-  const borrowerLoans = getLoansByBorrower(person.id)
+  const allBorrowerLoans = getLoansByBorrower(person.id)
+  const borrowerLoans = allBorrowerLoans.filter(isOpenLoan)
   const borrowerPayments = getPaymentsByBorrower(person.id)
   const totalDue = getBorrowerOutstanding(loans, person.id)
 
@@ -94,23 +96,25 @@ export function BorrowerDetail({ id }: { id: string }) {
         </DetailGrid>
       </DetailSection>
 
-      <DetailSection
-        title="Loans"
-        count={borrowerLoans.length}
-        countLabel={`${borrowerLoans.length} loans`}
-      >
-        <div className="link-card-list">
-          {borrowerLoans.map((loan) => (
-            <LinkCard
-              key={loan.id}
-              title={loan.id}
-              subtitle={`${loan.purpose ? `${loan.purpose} · ` : ''}${formatDaysLent(getLoanLentDays(loan), loan)}`}
-              meta={getLoanListAmountLabel(loan)}
-              route={{ type: 'loan', id: loan.id }}
-            />
-          ))}
-        </div>
-      </DetailSection>
+      {borrowerLoans.length > 0 && (
+        <DetailSection
+          title="Loans"
+          count={borrowerLoans.length}
+          countLabel={`${borrowerLoans.length} loans`}
+        >
+          <div className="link-card-list">
+            {borrowerLoans.map((loan) => (
+              <LinkCard
+                key={loan.id}
+                title={loan.id}
+                subtitle={`${loan.purpose ? `${loan.purpose} · ` : ''}${formatDaysLent(getLoanLentDays(loan), loan)}`}
+                meta={getLoanListAmountLabel(loan)}
+                route={{ type: 'loan', id: loan.id }}
+              />
+            ))}
+          </div>
+        </DetailSection>
+      )}
 
       <DetailSection title="Payments">
         {borrowerPayments.length === 0 ? (
@@ -172,9 +176,9 @@ export function BorrowerDetail({ id }: { id: string }) {
         <div className="modal-summary">
           <strong>{person.name}</strong>
           <span>{person.id}</span>
-          {borrowerLoans.length > 0 && (
+          {allBorrowerLoans.length > 0 && (
             <span>
-              {borrowerLoans.length} loan{borrowerLoans.length === 1 ? '' : 's'} will be deleted
+              {allBorrowerLoans.length} loan{allBorrowerLoans.length === 1 ? '' : 's'} will be deleted
             </span>
           )}
           {borrowerPayments.length > 0 && (

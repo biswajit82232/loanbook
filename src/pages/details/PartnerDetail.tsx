@@ -3,6 +3,7 @@ import {
   calculatePartnerInterestOnLoan,
   formatCurrency,
   getLoansForPartner,
+  isOpenLoan,
   getPartnerInterestDue,
   getPartnerPrincipalDeployed,
   formatShareRate,
@@ -31,7 +32,8 @@ export function PartnerDetail({ id }: { id: string }) {
     return <p className="empty-state">Partner not found.</p>
   }
 
-  const partnerLoans = getLoansForPartner(partner.id, loans)
+  const allPartnerLoans = getLoansForPartner(partner.id, loans)
+  const partnerLoans = allPartnerLoans.filter(isOpenLoan)
   const deployed = getPartnerPrincipalDeployed(partner.id, loans)
   const interestDue = getPartnerInterestDue(partner.id, loans)
 
@@ -79,14 +81,12 @@ export function PartnerDetail({ id }: { id: string }) {
         </DetailGrid>
       </DetailSection>
 
-      <DetailSection
-        title="Loans"
-        count={partnerLoans.length}
-        countLabel={`${partnerLoans.length} loans`}
-      >
-        {partnerLoans.length === 0 ? (
-          <p className="empty-inline">No loans</p>
-        ) : (
+      {partnerLoans.length > 0 && (
+        <DetailSection
+          title="Loans"
+          count={partnerLoans.length}
+          countLabel={`${partnerLoans.length} loans`}
+        >
           <div className="link-card-list">
             {partnerLoans.map((loan) => {
               const share = getPartnerShareOnLoan(loan, partner.id)
@@ -120,8 +120,8 @@ export function PartnerDetail({ id }: { id: string }) {
               )
             })}
           </div>
-        )}
-      </DetailSection>
+        </DetailSection>
+      )}
 
       <div className="detail-actions">
         <button
@@ -151,10 +151,10 @@ export function PartnerDetail({ id }: { id: string }) {
         <div className="modal-summary">
           <strong>{partner.name}</strong>
           <span>{partner.id}</span>
-          {partnerLoans.length > 0 && (
+          {allPartnerLoans.length > 0 && (
             <span>
-              Will be removed from {partnerLoans.length} loan
-              {partnerLoans.length === 1 ? '' : 's'}
+              Will be removed from {allPartnerLoans.length} loan
+              {allPartnerLoans.length === 1 ? '' : 's'}
             </span>
           )}
         </div>

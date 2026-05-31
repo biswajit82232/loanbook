@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import {
-  compareLoanByStartDateNewest,
+  compareLoanWithClosedLast,
   formatCurrency,
   formatDaysLent,
   getBuiltUpInterest,
@@ -19,7 +19,7 @@ export function Loans() {
   const { loans, getBorrower } = useLoanBook()
 
   const sortedLoans = useMemo(
-    () => [...loans].sort(compareLoanByStartDateNewest),
+    () => [...loans].sort(compareLoanWithClosedLast),
     [loans],
   )
 
