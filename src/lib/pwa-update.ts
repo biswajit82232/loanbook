@@ -12,6 +12,37 @@ function emitUpdateState() {
   }
 }
 
+function markUpdateReady(apply: (reloadPage?: boolean) => Promise<void>) {
+  updateAvailable = true
+  activateUpdate = apply
+  emitUpdateState()
+}
+
+/** True when a new SW is installed but waiting for user to reload (prompt mode). */
+function hasWaitingUpdate(registration: ServiceWorkerRegistration): boolean {
+  return Boolean(registration.waiting && navigator.serviceWorker.controller)
+}
+
+function watchRegistration(
+  registration: ServiceWorkerRegistration,
+  apply: (reloadPage?: boolean) => Promise<void>,
+) {
+  if (hasWaitingUpdate(registration)) {
+    markUpdateReady(apply)
+  }
+
+  registration.addEventListener('updatefound', () => {
+    const installing = registration.installing
+    if (!installing) return
+
+    installing.addEventListener('statechange', () => {
+      if (installing.state === 'installed' && hasWaitingUpdate(registration)) {
+        markUpdateReady(apply)
+      }
+    })
+  })
+}
+
 export function subscribeAppUpdate(listener: UpdateListener): () => void {
   listeners.add(listener)
   listener(updateAvailable)
@@ -39,27 +70,32 @@ export function registerAppUpdates() {
   navigator.serviceWorker?.addEventListener('controllerchange', () => {
     if (refreshing) return
     refreshing = true
+    updateAvailable = false
     window.location.reload()
   })
 
   const updateSW = registerSW({
     immediate: true,
     onNeedRefresh() {
-      updateAvailable = true
-      activateUpdate = updateSW
-      emitUpdateState()
+      markUpdateReady(updateSW)
     },
     onRegisteredSW(_url, registration) {
       if (!registration) return
 
-      const check = () => {
+      watchRegistration(registration, updateSW)
+
+      const checkForUpdate = () => {
         if (document.visibilityState === 'visible') {
-          void registration.update()
+          void registration.update().then(() => {
+            if (hasWaitingUpdate(registration)) {
+              markUpdateReady(updateSW)
+            }
+          })
         }
       }
 
-      document.addEventListener('visibilitychange', check)
-      window.setInterval(() => void registration.update(), 60 * 60 * 1000)
+      document.addEventListener('visibilitychange', checkForUpdate)
+      window.setInterval(checkForUpdate, 60 * 60 * 1000)
     },
   })
 }

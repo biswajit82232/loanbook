@@ -16,7 +16,8 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      /** User confirms reload via notification bell (see src/lib/pwa-update.ts). */
+      registerType: 'prompt',
       includeAssets: ['favicon.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'LoanBook',
@@ -51,8 +52,6 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         cleanupOutdatedCaches: true,
-        skipWaiting: true,
-        clientsClaim: true,
       },
     }),
   ],
