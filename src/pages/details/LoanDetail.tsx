@@ -16,6 +16,7 @@ import {
 import { BtnIcon } from '../../components/BtnIcon'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Icon } from '../../components/icons'
+import { formatDueSummary, getLoanDueInfo } from '../../data/loan-due'
 import { useNavigation } from '../../context/NavigationContext'
 import { useLoanBook } from '../../context/LoanBookContext'
 import { DetailField, DetailGrid, DetailSection } from '../../components/DetailSection'
@@ -26,7 +27,7 @@ import { SafeText } from '../../components/SafeText'
 
 export function LoanDetail({ id }: { id: string }) {
   const { openPaymentForm, openLoanForm, goBack } = useNavigation()
-  const { getLoan, getBorrower, getPartner, getPaymentsByLoan, loans, deleteLoan } =
+  const { getLoan, getBorrower, getPartner, getPaymentsByLoan, loans, settings, deleteLoan } =
     useLoanBook()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -59,11 +60,20 @@ export function LoanDetail({ id }: { id: string }) {
   const isActive = loan.status === 'Active'
   const daysLent = getLoanLentDays(loan)
   const interestLogRows = getInterestLogForDisplay(loan)
+  const due = getLoanDueInfo(loan, new Date(), settings.reminderPeriodDays)
+  const dueSummary = formatDueSummary(due)
 
   return (
     <div className="page detail-page">
       <div className="detail-hero">
-        <span className={`badge badge-${loan.status.toLowerCase()}`}>{loan.status}</span>
+        <span className="detail-hero-badges">
+          {due.status !== 'none' && due.status !== 'upcoming' && (
+            <span className={`badge badge-${due.status === 'overdue' ? 'due' : due.status === 'due_soon' ? 'due-soon' : 'pending'}`}>
+              {due.statusLabel}
+            </span>
+          )}
+          <span className={`badge badge-${loan.status.toLowerCase()}`}>{loan.status}</span>
+        </span>
         <SafeAmount amount={loan.principal} className="detail-hero-amount" />
         <p className="detail-hero-sub text-safe">
           {loan.purpose && <>{loan.purpose}</>}
@@ -91,6 +101,13 @@ export function LoanDetail({ id }: { id: string }) {
         <DetailGrid>
           <DetailField label="Loan ID" value={loan.id} />
           <DetailField label="Lent on" value={loan.startDate} />
+          <DetailField
+            label={loan.status === 'Pending' ? 'Disbursement due' : 'Interest due date'}
+            value={due.dueDateLabel}
+          />
+          {dueSummary && (
+            <DetailField label="Due status" value={dueSummary} full />
+          )}
           <DetailField label="Interest collected" value={formatCurrency(loan.interestCollected)} />
           <DetailField label="Last payment" value={loan.lastPaymentDate ?? '—'} />
         </DetailGrid>

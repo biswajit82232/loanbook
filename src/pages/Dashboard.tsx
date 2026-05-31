@@ -4,18 +4,38 @@ import { useNavigation } from '../context/NavigationContext'
 import { useLoanBook } from '../context/LoanBookContext'
 import { KpiCard } from '../components/KpiCard'
 import { SafeText } from '../components/SafeText'
-import { formatCurrency, getPaymentTypeLabel, getPortfolioStats, parseAppDate } from '../data/helpers'
+import {
+  compareLoanByStartDateNewest,
+  formatCurrency,
+  formatDaysLent,
+  getBuiltUpInterest,
+  getLoanLentDays,
+  getLoanListAmountLabel,
+  getPaymentTypeLabel,
+  getPortfolioStats,
+  parseAppDate,
+} from '../data/helpers'
+import { dueStatusBadgeClass, formatDueSummary, getLoanDueInfo } from '../data/loan-due'
 import {
   getDashboardAttentionItems,
   type DashboardAttentionItem,
 } from '../data/reminders'
 
 function attentionKindLabel(kind: DashboardAttentionItem['kind']) {
-  return kind === 'payment_due' ? 'Interest due' : 'Pending loan'
+  switch (kind) {
+    case 'payment_due':
+      return 'Overdue'
+    case 'payment_due_soon':
+      return 'Due soon'
+    case 'pending_loan':
+      return 'Pending'
+    default:
+      return 'Attention'
+  }
 }
 
 export function Dashboard() {
-  const { openDetail } = useNavigation()
+  const { openDetail, setPage } = useNavigation()
   const { loans, payments, settings, getBorrower, dismissReminder } = useLoanBook()
   const stats = getPortfolioStats(loans, payments)
 
@@ -25,8 +45,15 @@ export function Dashboard() {
         loans,
         new Set(settings.reminderDismissed),
         (borrowerId) => getBorrower(borrowerId)?.name ?? '',
+        new Date(),
+        settings.reminderPeriodDays,
       ),
-    [loans, settings.reminderDismissed, getBorrower],
+    [loans, settings.reminderDismissed, settings.reminderPeriodDays, getBorrower],
+  )
+
+  const newestLoans = useMemo(
+    () => [...loans].sort(compareLoanByStartDateNewest).slice(0, 3),
+    [loans],
   )
 
   const recentPayments = [...payments]
@@ -35,7 +62,7 @@ export function Dashboard() {
       const tb = parseAppDate(b.date)?.getTime() ?? 0
       return tb - ta || b.id.localeCompare(a.id)
     })
-    .slice(0, 5)
+    .slice(0, 10)
 
   return (
     <div className="page">
@@ -66,7 +93,12 @@ export function Dashboard() {
         ) : (
           <ul className="compact-list attention-list">
             {attentionItems.map((item) => {
-              const typeBadge = item.kind === 'payment_due' ? 'due' : 'pending'
+              const typeBadge =
+                item.kind === 'payment_due'
+                  ? 'due'
+                  : item.kind === 'payment_due_soon'
+                    ? 'due-soon'
+                    : 'pending'
               return (
                 <li key={item.id} className="attention-list-item">
                   <button
@@ -103,6 +135,89 @@ export function Dashboard() {
                       <Icon name="x" size={14} />
                     </button>
                   )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section className="panel panel--flush-list">
+        <header className="attention-panel-head">
+          <h2>Newest loans</h2>
+          {loans.length > 3 && (
+            <button type="button" className="panel-inline-link" onClick={() => setPage('loans')}>
+              View all
+            </button>
+          )}
+        </header>
+        {newestLoans.length === 0 ? (
+          <p className="empty-inline">No loans</p>
+        ) : (
+          <ul className="compact-list dashboard-loan-list">
+            {newestLoans.map((loan) => {
+              const borrower = getBorrower(loan.borrowerId)
+              const days = formatDaysLent(getLoanLentDays(loan), loan)
+              const interest = loan.status === 'Active' ? getBuiltUpInterest(loan) : 0
+              const due = getLoanDueInfo(loan, new Date(), settings.reminderPeriodDays)
+              const dueSummary = formatDueSummary(due)
+              const showDueBadge =
+                due.status === 'overdue' || due.status === 'due_soon' || due.status === 'scheduled'
+
+              return (
+                <li key={loan.id}>
+                  <button
+                    type="button"
+                    className="compact-row"
+                    onClick={() => openDetail({ type: 'loan', id: loan.id })}
+                  >
+                    <div className="compact-row-top">
+                      <SafeText as="span" className="compact-row-id">
+                        {loan.id}
+                      </SafeText>
+                      <span className="compact-row-badges">
+                        {showDueBadge && due.status !== 'upcoming' && (
+                          <span className={`badge badge-${dueStatusBadgeClass(due.status)}`}>
+                            {due.statusLabel}
+                          </span>
+                        )}
+                        <span className={`badge badge-${loan.status.toLowerCase()}`}>
+                          {loan.status}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="compact-row-mid">
+                      <SafeText as="span" className="compact-row-name">
+                        {borrower?.name ?? '—'}
+                      </SafeText>
+                      {dueSummary ? (
+                        <>
+                          <span className="compact-row-dot">·</span>
+                          <span className="compact-row-days">{dueSummary}</span>
+                        </>
+                      ) : (
+                        days !== '—' && (
+                          <>
+                            <span className="compact-row-dot">·</span>
+                            <span className="compact-row-days">{days}</span>
+                          </>
+                        )
+                      )}
+                    </div>
+                    <div className="compact-row-bottom">
+                      <SafeText as="span" className="compact-row-principal" variant="amount">
+                        {getLoanListAmountLabel(loan)}
+                        {loan.status !== 'Pending' && (
+                          <span className="compact-row-principal-label"> lent</span>
+                        )}
+                      </SafeText>
+                      {loan.status === 'Active' && interest > 0 && (
+                        <SafeText as="span" className="compact-row-interest" variant="amount">
+                          · {formatCurrency(interest)} int.
+                        </SafeText>
+                      )}
+                    </div>
+                  </button>
                 </li>
               )
             })}

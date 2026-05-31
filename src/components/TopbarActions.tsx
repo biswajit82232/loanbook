@@ -33,7 +33,11 @@ export function TopbarActions() {
     () => new Set(settings.reminderDismissed),
     [settings.reminderDismissed],
   )
-  const reminders = getMonthlyLoanReminders(loans, dismissed)
+  const reminders = useMemo(
+    () =>
+      getMonthlyLoanReminders(loans, dismissed, new Date(), settings.reminderPeriodDays),
+    [loans, dismissed, settings.reminderPeriodDays],
+  )
   const showNotifications = updateAvailable || (page === 'dashboard' && !detail)
   const notifyBadgeCount = reminders.length + (updateAvailable ? 1 : 0)
 
@@ -177,9 +181,15 @@ export function TopbarActions() {
                             {borrower?.name ?? '—'} · {r.loan.id}
                           </span>
                           <span className="topbar-notify-sub">
-                            {formatReminderPeriodLabel(r)} · {formatCurrency(r.interestDue)} int.
+                            {formatReminderPeriodLabel(r)}
+                            {r.interestDue > 0
+                              ? ` · ${formatCurrency(r.interestDue)} int.`
+                              : ''}
                           </span>
-                          <span className="topbar-notify-sub">{getAnchorLabel(r.loan)}</span>
+                          <span className="topbar-notify-sub">
+                            {getAnchorLabel(r.loan)}
+                            {r.due.dueDateLabel !== '—' ? ` · Due ${r.due.dueDateLabel}` : ''}
+                          </span>
                         </button>
                         <div className="topbar-notify-actions">
                           {borrower && borrowerHasPhone(borrower) && (

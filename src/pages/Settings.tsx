@@ -157,7 +157,7 @@ export function Settings() {
 
         <SettingsCollapsible title="Reminders">
           <label className="field">
-            <span className="field-label">Reminder period (days)</span>
+            <span className="field-label">Interest due every (days)</span>
             <input
               type="number"
               value={form.reminderPeriodDays}
@@ -170,6 +170,10 @@ export function Settings() {
                 patch({ reminderPeriodDays: n })
               }}
             />
+            <span className="field-hint">
+              Due date = last payment (or lend date) plus this many days. Powers reminders and
+              Needs attention.
+            </span>
           </label>
         </SettingsCollapsible>
 

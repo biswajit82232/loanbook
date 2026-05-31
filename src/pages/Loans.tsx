@@ -7,6 +7,7 @@ import {
   getLoanLentDays,
   getLoanListAmountLabel,
 } from '../data/helpers'
+import { dueStatusBadgeClass, formatDueSummary, getLoanDueInfo } from '../data/loan-due'
 import { BtnIcon } from '../components/BtnIcon'
 import { ListPagination } from '../components/ListPagination'
 import { SafeText } from '../components/SafeText'
@@ -16,7 +17,7 @@ import { useLoanBook } from '../context/LoanBookContext'
 
 export function Loans() {
   const { openDetail, openLoanForm } = useNavigation()
-  const { loans, getBorrower } = useLoanBook()
+  const { loans, getBorrower, settings } = useLoanBook()
 
   const sortedLoans = useMemo(
     () => [...loans].sort(compareLoanWithClosedLast),
@@ -52,6 +53,10 @@ export function Loans() {
             const days = formatDaysLent(getLoanLentDays(loan), loan)
             const interest =
               loan.status === 'Active' ? getBuiltUpInterest(loan) : 0
+            const due = getLoanDueInfo(loan, new Date(), settings.reminderPeriodDays)
+            const dueSummary = formatDueSummary(due)
+            const showDueBadge =
+              due.status === 'overdue' || due.status === 'due_soon' || due.status === 'scheduled'
 
             return (
               <li key={loan.id}>
@@ -64,14 +69,32 @@ export function Loans() {
                     <SafeText as="span" className="compact-row-id">
                       {loan.id}
                     </SafeText>
-                    <span className={`badge badge-${loan.status.toLowerCase()}`}>{loan.status}</span>
+                    <span className="compact-row-badges">
+                      {showDueBadge && due.status !== 'upcoming' && (
+                        <span className={`badge badge-${dueStatusBadgeClass(due.status)}`}>
+                          {due.statusLabel}
+                        </span>
+                      )}
+                      <span className={`badge badge-${loan.status.toLowerCase()}`}>{loan.status}</span>
+                    </span>
                   </div>
                   <div className="compact-row-mid">
                     <SafeText as="span" className="compact-row-name">
                       {borrower?.name ?? '—'}
                     </SafeText>
-                    {days !== '—' && <span className="compact-row-dot">·</span>}
-                    {days !== '—' && <span className="compact-row-days">{days}</span>}
+                    {dueSummary ? (
+                      <>
+                        <span className="compact-row-dot">·</span>
+                        <span className="compact-row-days">{dueSummary}</span>
+                      </>
+                    ) : (
+                      days !== '—' && (
+                        <>
+                          <span className="compact-row-dot">·</span>
+                          <span className="compact-row-days">{days}</span>
+                        </>
+                      )
+                    )}
                   </div>
                   <div className="compact-row-bottom">
                     <SafeText as="span" className="compact-row-principal" variant="amount">

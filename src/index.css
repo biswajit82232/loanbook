@@ -987,10 +987,25 @@ select {
   line-height: 1.3;
 }
 
-.compact-row-top .badge {
+.compact-row-badges,
+.detail-hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+.compact-row-top .badge,
+.detail-hero-badges .badge {
   padding: 0.1rem 0.4rem;
   font-size: 0.625rem;
   flex-shrink: 0;
+}
+
+.detail-hero-badges {
+  justify-content: center;
+  margin-bottom: 0.25rem;
 }
 
 .compact-row-mid {
@@ -1352,6 +1367,27 @@ select {
   color: var(--text-muted);
 }
 
+.panel-inline-link {
+  border: none;
+  background: none;
+  padding: 0.15rem 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.panel-inline-link:hover,
+.panel-inline-link:focus-visible {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+.panel--flush-list .dashboard-loan-list {
+  margin: 0;
+}
+
 .attention-count {
   display: inline-flex;
   align-items: center;
@@ -1405,6 +1441,10 @@ select {
 
 .attention-row--due {
   border-left: 2px solid var(--warning);
+}
+
+.attention-row--due-soon {
+  border-left: 2px solid #ea580c;
 }
 
 .attention-row--pending {
@@ -1646,6 +1686,11 @@ select {
 .badge-due {
   background: rgba(251, 191, 36, 0.15);
   color: var(--warning);
+}
+
+.badge-due-soon {
+  background: rgba(249, 115, 22, 0.14);
+  color: #ea580c;
 }
 
 .badge-upcoming {
@@ -2083,6 +2128,12 @@ select {
 .field-label {
   font-size: 0.875rem;
   font-weight: 500;
+}
+
+.field-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
 .field-required {

@@ -23,21 +23,28 @@ function hasWaitingUpdate(registration: ServiceWorkerRegistration): boolean {
   return Boolean(registration.waiting && navigator.serviceWorker.controller)
 }
 
-function watchRegistration(
+function syncWaitingState(
   registration: ServiceWorkerRegistration,
   apply: (reloadPage?: boolean) => Promise<void>,
 ) {
   if (hasWaitingUpdate(registration)) {
     markUpdateReady(apply)
   }
+}
+
+function watchRegistration(
+  registration: ServiceWorkerRegistration,
+  apply: (reloadPage?: boolean) => Promise<void>,
+) {
+  syncWaitingState(registration, apply)
 
   registration.addEventListener('updatefound', () => {
     const installing = registration.installing
     if (!installing) return
 
     installing.addEventListener('statechange', () => {
-      if (installing.state === 'installed' && hasWaitingUpdate(registration)) {
-        markUpdateReady(apply)
+      if (installing.state === 'installed') {
+        syncWaitingState(registration, apply)
       }
     })
   })
@@ -85,17 +92,21 @@ export function registerAppUpdates() {
       watchRegistration(registration, updateSW)
 
       const checkForUpdate = () => {
-        if (document.visibilityState === 'visible') {
-          void registration.update().then(() => {
-            if (hasWaitingUpdate(registration)) {
-              markUpdateReady(updateSW)
-            }
-          })
-        }
+        if (document.visibilityState !== 'visible') return
+        void registration
+          .update()
+          .then(() => syncWaitingState(registration, updateSW))
+          .catch(() => {})
       }
 
+      // Run as soon as the SW is registered (no need to reload the page first).
+      checkForUpdate()
+      window.setTimeout(checkForUpdate, 2_000)
+
       document.addEventListener('visibilitychange', checkForUpdate)
-      window.setInterval(checkForUpdate, 5 * 60 * 1000)
+      window.addEventListener('focus', checkForUpdate)
+      window.addEventListener('online', checkForUpdate)
+      window.setInterval(checkForUpdate, 90 * 1000)
     },
   })
 }
