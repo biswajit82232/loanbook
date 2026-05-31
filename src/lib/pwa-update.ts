@@ -95,7 +95,7 @@ export function registerAppUpdates() {
       }
 
       document.addEventListener('visibilitychange', checkForUpdate)
-      window.setInterval(checkForUpdate, 60 * 60 * 1000)
+      window.setInterval(checkForUpdate, 5 * 60 * 1000)
     },
   })
 }

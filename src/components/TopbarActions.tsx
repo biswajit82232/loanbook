@@ -3,6 +3,7 @@ import { BorrowerContactButtons } from './BorrowerContactButtons'
 import { useLoanBook } from '../context/LoanBookContext'
 import { useNavigation } from '../context/NavigationContext'
 import { applyAppUpdate, subscribeAppUpdate } from '../lib/pwa-update'
+import { APP_VERSION } from '../lib/version'
 import {
   formatReminderPeriodLabel,
   getAnchorLabel,
@@ -140,7 +141,7 @@ export function TopbarActions() {
                 <div className="topbar-notify-update">
                   <p className="topbar-notify-update-title">App update available</p>
                   <p className="topbar-notify-update-sub">
-                    A new version of LoanBook is ready. Reload to use the latest features and fixes.
+                    You&apos;re on v{APP_VERSION}. A newer build is ready — reload to update.
                   </p>
                   <button
                     type="button"
