@@ -12,8 +12,8 @@ import { KpiCard } from '../components/KpiCard'
 
 export function Partners() {
   const { openDetail, openPartnerForm } = useNavigation()
-  const { partners, loans, getPartner } = useLoanBook()
-  const stats = getPartnerPortfolioStats(partners, loans, getPartner)
+  const { partners, loans } = useLoanBook()
+  const stats = getPartnerPortfolioStats(partners, loans)
 
   return (
     <div className="page">
@@ -43,7 +43,7 @@ export function Partners() {
         <ul className="compact-list">
           {partners.map((partner) => {
             const deployed = getPartnerPrincipalDeployed(partner.id, loans)
-            const interestDue = getPartnerInterestDue(partner.id, loans, getPartner)
+            const interestDue = getPartnerInterestDue(partner.id, loans)
 
             return (
               <li key={partner.id}>

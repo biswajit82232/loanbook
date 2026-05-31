@@ -35,7 +35,9 @@
   --kpi-value: clamp(1.125rem, 4.2vw, 1.5rem);
   --touch: 44px;
   --page-pad: 1rem;
-  --transition: 0.18s ease;
+  --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition: 0.2s var(--ease-in-out);
   font-family:
     'DM Sans',
     system-ui,
@@ -2851,4 +2853,247 @@ html[data-compact] .link-card {
   font-size: 0.8125rem;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* —— Mobile layout, touch & performance (phones / small tablets) —— */
+@media (max-width: 1023px) {
+  :root {
+    --topbar-height: 64px;
+    --touch: 48px;
+    --page-pad: 1.125rem;
+    --kpi-label: 0.75rem;
+    --kpi-value: clamp(1.25rem, 5vw, 1.625rem);
+    --radius-sm: 14px;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  .main-column {
+    contain: layout style;
+  }
+
+  .topbar {
+    gap: 0.75rem;
+    min-height: calc(var(--topbar-height) + var(--safe-top));
+    padding: calc(var(--safe-top) + 0.35rem) var(--page-pad) 0.65rem;
+    background: var(--bg-elevated);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  [data-theme='light'] .topbar {
+    background: var(--bg-elevated);
+  }
+
+  .page-title {
+    font-size: 1.3125rem;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1.2;
+  }
+
+  .menu-btn,
+  .back-btn {
+    width: var(--touch);
+    height: var(--touch);
+    min-width: var(--touch);
+    border-radius: var(--radius-sm);
+    touch-action: manipulation;
+    transition:
+      border-color var(--transition),
+      background var(--transition),
+      transform 0.12s var(--ease-out);
+  }
+
+  .menu-btn:active,
+  .back-btn:active {
+    transform: scale(0.96);
+  }
+
+  .menu-icon .icon,
+  .back-btn-icon {
+    width: 1.375rem;
+    height: 1.375rem;
+  }
+
+  .topbar-icon-btn {
+    width: var(--touch);
+    height: var(--touch);
+    touch-action: manipulation;
+    transition:
+      border-color var(--transition),
+      color var(--transition),
+      transform 0.12s var(--ease-out);
+  }
+
+  .topbar-icon-btn:active {
+    transform: scale(0.96);
+  }
+
+  .topbar-notify-panel {
+    width: min(22rem, calc(100vw - var(--page-pad) * 2));
+    max-height: min(70dvh, 28rem);
+  }
+
+  .main-content {
+    padding: var(--space-lg) var(--page-pad) calc(1.5rem + var(--safe-bottom));
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sidebar {
+    width: min(20rem, 88vw);
+    transition: transform 0.32s var(--ease-out);
+  }
+
+  .sidebar-nav {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .nav-item {
+    min-height: var(--touch);
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    touch-action: manipulation;
+  }
+
+  .nav-label {
+    font-size: 1rem;
+  }
+
+  .kpi-card {
+    min-height: 5.75rem;
+    padding: var(--space-md) 1rem;
+  }
+
+  .kpi-value {
+    font-size: var(--kpi-value);
+  }
+
+  .compact-list {
+    gap: 0.5rem;
+  }
+
+  .compact-row {
+    min-height: 3.25rem;
+    padding: 0.875rem 1rem;
+    touch-action: manipulation;
+    transition:
+      border-color var(--transition),
+      background var(--transition),
+      transform 0.12s var(--ease-out);
+  }
+
+  .compact-row:active {
+    transform: scale(0.99);
+  }
+
+  .compact-row-id {
+    font-size: 0.9375rem;
+  }
+
+  .compact-row-mid,
+  .compact-row-bottom {
+    font-size: 0.8125rem;
+  }
+
+  .compact-row-top .badge {
+    font-size: 0.6875rem;
+    padding: 0.15rem 0.45rem;
+  }
+
+  .link-card {
+    min-height: 3.25rem;
+    padding: 0.875rem 1rem;
+    touch-action: manipulation;
+  }
+
+  .link-card-body strong {
+    font-size: 0.9375rem;
+  }
+
+  .link-card-body span,
+  .link-card-meta {
+    font-size: 0.8125rem;
+  }
+
+  .activity-item,
+  .attention-card-body {
+    min-height: 3.25rem;
+    touch-action: manipulation;
+  }
+
+  .attention-card-name {
+    font-size: 1.125rem;
+  }
+
+  .btn {
+    min-height: var(--touch);
+    font-size: 0.9375rem;
+    padding: 0.75rem 1.25rem;
+  }
+
+  .btn-sm {
+    min-height: 2.75rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .field input,
+  .field select,
+  .field textarea {
+    min-height: var(--touch);
+    font-size: 1rem;
+    padding: 0.75rem 0.875rem;
+  }
+
+  .field-label {
+    font-size: 0.8125rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .detail-hero-amount {
+    font-size: 1.5rem;
+  }
+
+  .detail-actions {
+    gap: 0.625rem;
+  }
+
+  .panel {
+    padding: 1.125rem;
+  }
+
+  .panel > h2,
+  .attention-panel-head h2 {
+    font-size: 0.875rem;
+  }
+
+  .list-search input {
+    min-height: var(--touch);
+    font-size: 1rem;
+  }
+
+  .option-buttons button {
+    min-height: 2.75rem;
+    padding: 0.625rem 0.875rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .sidebar {
+    transition: none;
+  }
 }

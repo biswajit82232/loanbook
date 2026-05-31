@@ -111,11 +111,11 @@ export function LoanDetail({ id }: { id: string }) {
                   title={partner.name}
                   subtitle={`${formatCurrency(share.amount)} · ${formatShareRate(share)}`}
                   meta={
-                    isActive
-                      ? share.amount > 0
-                        ? `${formatCurrency(principalShare)} · ${formatCurrency(partnerInterest)} due`
-                        : `${formatCurrency(partnerInterest)} int. due`
-                      : '—'
+                    isActive && partnerInterest > 0
+                      ? `${formatCurrency(partnerInterest)} int. due`
+                      : isActive && principalShare > 0
+                        ? `${formatCurrency(principalShare)} deployed`
+                        : '—'
                   }
                   route={{ type: 'partner', id: partner.id }}
                 />

@@ -6,6 +6,7 @@ import {
   getPartnerPrincipalDeployed,
   formatShareRate,
   getPartnerDeployedOnLoan,
+  getPartnerShareOnLoan,
 } from '../../data/helpers'
 import { formatDisplayPhone } from '../../utils/phone'
 import { BtnIcon } from '../../components/BtnIcon'
@@ -26,7 +27,7 @@ export function PartnerDetail({ id }: { id: string }) {
 
   const partnerLoans = getLoansForPartner(partner.id, loans)
   const deployed = getPartnerPrincipalDeployed(partner.id, loans)
-  const interestDue = getPartnerInterestDue(partner.id, loans, getPartner)
+  const interestDue = getPartnerInterestDue(partner.id, loans)
 
   return (
     <div className="page detail-page">
@@ -61,7 +62,7 @@ export function PartnerDetail({ id }: { id: string }) {
         ) : (
           <div className="link-card-list">
             {partnerLoans.map((loan) => {
-              const share = (loan.partnerShares ?? []).find((s) => s.partnerId === partner.id)
+              const share = getPartnerShareOnLoan(loan, partner.id)
               const principalShare = share ? getPartnerDeployedOnLoan(loan, share) : 0
               const loanInterest =
                 loan.status === 'Active' && share
@@ -81,11 +82,11 @@ export function PartnerDetail({ id }: { id: string }) {
                     .filter(Boolean)
                     .join(' · ') || '—'}
                   meta={
-                    loan.status === 'Active'
-                      ? share && share.amount <= 0 && loanInterest > 0
-                        ? `${formatCurrency(loanInterest)} int. due`
-                        : `${formatCurrency(principalShare)} · ${formatCurrency(loanInterest)} due`
-                      : loan.status
+                    loan.status === 'Active' && share && share.rate > 0
+                      ? `${formatCurrency(loanInterest)} int. due`
+                      : loan.status === 'Active' && principalShare > 0
+                        ? `${formatCurrency(principalShare)} deployed`
+                        : loan.status
                   }
                   route={{ type: 'loan', id: loan.id }}
                 />

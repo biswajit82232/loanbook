@@ -681,27 +681,37 @@ export function nextPartnerId(partners: Partner[]): string {
   return `PR-${String(max + 1).padStart(3, '0')}`
 }
 
+export function normalizePartnerShare(
+  raw: LoanPartnerShare & { sharePercent?: number },
+  loanPrincipal = 0,
+): LoanPartnerShare {
+  const rate = Number(raw.rate)
+  const parsedRate = Number.isFinite(rate) ? Math.max(0, rate) : 0
+  const amountRaw = Number(raw.amount)
+  if (Number.isFinite(amountRaw)) {
+    return {
+      partnerId: raw.partnerId,
+      amount: Math.max(0, amountRaw),
+      rate: parsedRate,
+      ratePeriod: raw.ratePeriod === 'yearly' ? 'yearly' : 'monthly',
+    }
+  }
+  const pct = Number(raw.sharePercent)
+  const pctNum = Number.isFinite(pct) ? pct : 0
+  return {
+    partnerId: raw.partnerId,
+    amount: loanPrincipal > 0 ? Math.round((loanPrincipal * pctNum) / 100) : 0,
+    rate: parsedRate,
+    ratePeriod: raw.ratePeriod === 'yearly' ? 'yearly' : 'monthly',
+  }
+}
+
 /** Legacy sharePercent → amount + rate fields */
 function migratePartnerShares(loan: Loan): LoanPartnerShare[] {
   const principal = loan.principal ?? 0
-  return (loan.partnerShares ?? []).map((raw) => {
-    const legacy = raw as LoanPartnerShare & { sharePercent?: number }
-    if (typeof legacy.amount === 'number' && Number.isFinite(legacy.amount)) {
-      return {
-        partnerId: legacy.partnerId,
-        amount: Math.max(0, legacy.amount),
-        rate: legacy.rate ?? 0,
-        ratePeriod: legacy.ratePeriod ?? 'monthly',
-      }
-    }
-    const pct = legacy.sharePercent ?? 0
-    return {
-      partnerId: legacy.partnerId,
-      amount: principal > 0 ? Math.round((principal * pct) / 100) : 0,
-      rate: legacy.rate ?? 0,
-      ratePeriod: legacy.ratePeriod ?? 'monthly',
-    }
-  })
+  return (loan.partnerShares ?? []).map((raw) =>
+    normalizePartnerShare(raw as LoanPartnerShare & { sharePercent?: number }, principal),
+  )
 }
 
 export function formatShareRate(share: LoanPartnerShare): string {
@@ -709,28 +719,27 @@ export function formatShareRate(share: LoanPartnerShare): string {
 }
 
 export function getPartnerShareOnLoan(loan: Loan, partnerId: string): LoanPartnerShare | undefined {
-  return (loan.partnerShares ?? []).find((s) => s.partnerId === partnerId)
+  const share = (loan.partnerShares ?? []).find((s) => s.partnerId === partnerId)
+  if (!share) return undefined
+  return normalizePartnerShare(share, loan.principal ?? 0)
 }
 
 /** Outstanding principal attributed to this partner on the loan (capital deployed) */
 export function getPartnerDeployedOnLoan(loan: Loan, share: LoanPartnerShare): number {
-  if (share.amount <= 0 || loan.principal <= 0) return 0
-  return Math.round(share.amount * (loan.principalOutstanding / loan.principal))
+  const normalized = normalizePartnerShare(share, loan.principal ?? 0)
+  if (normalized.amount <= 0 || loan.principal <= 0) return 0
+  return Math.round(normalized.amount * (loan.principalOutstanding / loan.principal))
 }
 
-/** Principal base for partner interest: share outstanding, or full loan when amount is 0 */
+/** Principal base for partner interest: always full loan outstanding (rate is on total, not share) */
 export function getPartnerInterestPrincipalBase(
   loan: Loan,
   share: LoanPartnerShare,
 ): number {
-  if (loan.status !== 'Active' || share.rate < 0) return 0
-  if (share.amount > 0 && loan.principal > 0) {
-    return getPartnerDeployedOnLoan(loan, share)
-  }
-  if (share.amount <= 0 && share.rate > 0) {
-    return loan.principalOutstanding
-  }
-  return 0
+  if (loan.status !== 'Active') return 0
+  const normalized = normalizePartnerShare(share, loan.principal ?? 0)
+  if (normalized.rate <= 0) return 0
+  return loan.principalOutstanding
 }
 
 /** Interest owed on this loan share at the rate set on the loan form */
@@ -739,17 +748,20 @@ export function calculatePartnerInterestOnLoan(
   share: LoanPartnerShare,
   asOf: Date = new Date(),
 ): number {
-  if (loan.status !== 'Active' || share.rate < 0) return 0
+  if (loan.status !== 'Active') return 0
 
-  const principalBase = getPartnerInterestPrincipalBase(loan, share)
+  const normalized = normalizePartnerShare(share, loan.principal ?? 0)
+  if (normalized.rate <= 0) return 0
+
+  const principalBase = getPartnerInterestPrincipalBase(loan, normalized)
   if (principalBase <= 0) return 0
 
   const days = getInterestAccrualDays(loan, asOf)
   if (days <= 0) return 0
 
-  const rate = share.rate / 100
+  const rate = normalized.rate / 100
   const interest =
-    share.ratePeriod === 'monthly'
+    normalized.ratePeriod === 'monthly'
       ? principalBase * rate * (days / 30)
       : principalBase * rate * (days / 365)
 
@@ -759,11 +771,7 @@ export function calculatePartnerInterestOnLoan(
 export function getPartnerInterestDue(
   partnerId: string,
   loans: Loan[],
-  getPartner: (id: string) => Partner | undefined,
 ): number {
-  const partner = getPartner(partnerId)
-  if (!partner || partner.status !== 'Active') return 0
-
   return loans
     .filter((l) => l.status === 'Active')
     .reduce((sum, loan) => {
@@ -789,18 +797,14 @@ export function getLoansForPartner(partnerId: string, loans: Loan[]): Loan[] {
   )
 }
 
-export function getPartnerPortfolioStats(
-  partners: Partner[],
-  loans: Loan[],
-  getPartner: (id: string) => Partner | undefined,
-) {
+export function getPartnerPortfolioStats(partners: Partner[], loans: Loan[]) {
   const active = partners.filter((p) => p.status === 'Active')
   const totalDeployed = active.reduce(
     (s, p) => s + getPartnerPrincipalDeployed(p.id, loans),
     0,
   )
-  const totalInterestDue = active.reduce(
-    (s, p) => s + getPartnerInterestDue(p.id, loans, getPartner),
+  const totalInterestDue = partners.reduce(
+    (s, p) => s + getPartnerInterestDue(p.id, loans),
     0,
   )
   return {
