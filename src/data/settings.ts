@@ -13,6 +13,7 @@ export const defaultSettings: AppSettings = {
   compactLists: false,
   reminderPeriodDays: 30,
   reminderDismissed: [],
+  attentionDismissed: [],
 }
 
 const THEMES: ThemePreference[] = ['system', 'light', 'dark']
@@ -44,6 +45,9 @@ export function normalizeSettings(raw: Partial<AppSettings> | null | undefined):
     reminderDismissed: Array.isArray(base.reminderDismissed)
       ? base.reminderDismissed.filter((k): k is string => typeof k === 'string')
       : defaultSettings.reminderDismissed,
+    attentionDismissed: Array.isArray(base.attentionDismissed)
+      ? base.attentionDismissed.filter((k): k is string => typeof k === 'string')
+      : defaultSettings.attentionDismissed,
   }
 }
 

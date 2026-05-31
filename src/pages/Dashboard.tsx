@@ -36,19 +36,19 @@ function attentionKindLabel(kind: DashboardAttentionItem['kind']) {
 
 export function Dashboard() {
   const { openDetail, setPage } = useNavigation()
-  const { loans, payments, settings, getBorrower, dismissReminder } = useLoanBook()
+  const { loans, payments, settings, getBorrower, dismissAttention } = useLoanBook()
   const stats = getPortfolioStats(loans, payments)
 
   const attentionItems = useMemo(
     () =>
       getDashboardAttentionItems(
         loans,
-        new Set(settings.reminderDismissed),
+        new Set(settings.attentionDismissed),
         (borrowerId) => getBorrower(borrowerId)?.name ?? '',
         new Date(),
         settings.reminderPeriodDays,
       ),
-    [loans, settings.reminderDismissed, settings.reminderPeriodDays, getBorrower],
+    [loans, settings.attentionDismissed, settings.reminderPeriodDays, getBorrower],
   )
 
   const newestLoans = useMemo(
@@ -128,7 +128,7 @@ export function Dashboard() {
                     <button
                       type="button"
                       className="attention-row-dismiss"
-                      onClick={() => dismissReminder(item.dismissKey!)}
+                      onClick={() => dismissAttention(item.dismissKey!)}
                       aria-label={`Dismiss reminder for ${item.borrowerName}`}
                       title="Dismiss"
                     >

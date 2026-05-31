@@ -131,7 +131,10 @@ export interface AppSettings {
   currency: CurrencyCode
   compactLists: boolean
   reminderPeriodDays: number
+  /** Dismissed keys for the notification bell only. */
   reminderDismissed: string[]
+  /** Dismissed keys for dashboard Needs attention only (independent of bell). */
+  attentionDismissed: string[]
 }
 
 export interface CreateLoanInput {

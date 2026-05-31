@@ -176,11 +176,12 @@ export function Borrowers() {
 
       {borrowers.length > 0 && (
         <label className="list-search field">
-          <span className="visually-hidden">Search borrowers</span>
+          <span className="visually-hidden">Search borrowers by name, phone, or ID</span>
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name, phone, or ID"
             autoComplete="off"
             enterKeyHint="search"
           />

@@ -1116,6 +1116,11 @@ select {
     box-shadow var(--transition);
 }
 
+.list-search input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
 .list-search input:focus {
   outline: none;
   border-color: var(--accent);

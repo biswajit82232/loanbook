@@ -115,6 +115,7 @@ interface LoanBookContextValue {
   getMonthSummary: (id: string) => MonthSummary | undefined
   updateSettings: (settings: AppSettings) => void
   dismissReminder: (dismissKey: string) => void
+  dismissAttention: (dismissKey: string) => void
   dataLoading: boolean
   dataReady: boolean
   loadProgress: LoadProgressUpdate
@@ -595,6 +596,19 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       updateSettings({
         ...settingsRef.current,
         reminderDismissed: [...keys],
+      })
+    },
+    [updateSettings],
+  )
+
+  const dismissAttention = useCallback(
+    (dismissKey: string) => {
+      const keys = new Set(settingsRef.current.attentionDismissed)
+      if (keys.has(dismissKey)) return
+      keys.add(dismissKey)
+      updateSettings({
+        ...settingsRef.current,
+        attentionDismissed: [...keys],
       })
     },
     [updateSettings],
@@ -1125,6 +1139,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       getMonthSummary,
       updateSettings,
       dismissReminder,
+      dismissAttention,
       dataLoading,
       dataReady,
       loadProgress,
@@ -1165,6 +1180,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       getMonthSummary,
       updateSettings,
       dismissReminder,
+      dismissAttention,
       dataLoading,
       dataReady,
       loadProgress,
