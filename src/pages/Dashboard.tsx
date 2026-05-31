@@ -40,17 +40,12 @@ export function Dashboard() {
 
   return (
     <div className="page">
-      <section className="kpi-grid kpi-grid--3">
+      <section className="kpi-grid kpi-grid--2">
         <KpiCard label="Principal out" value={formatCurrency(stats.principalDue)} variant="accent" />
         <KpiCard
           label="Borrower interest"
           value={formatCurrency(stats.interestDue)}
           variant="interest"
-        />
-        <KpiCard
-          label="Collected this month"
-          value={formatCurrency(stats.collectedMtd)}
-          variant="success"
         />
       </section>
 

@@ -1,12 +1,14 @@
 import { BtnIcon } from '../components/BtnIcon'
 import { SafeText } from '../components/SafeText'
-import { formatCurrency, getPaymentTypeLabel } from '../data/helpers'
+import { formatCurrency, getPaymentTypeLabel, getPortfolioStats } from '../data/helpers'
 import { useNavigation } from '../context/NavigationContext'
 import { useLoanBook } from '../context/LoanBookContext'
+import { KpiCard } from '../components/KpiCard'
 
 export function Payments() {
   const { openDetail, openPaymentForm } = useNavigation()
-  const { payments, getBorrower } = useLoanBook()
+  const { payments, loans, getBorrower } = useLoanBook()
+  const { collectedMtd } = getPortfolioStats(loans, payments)
 
   const sortedPayments = [...payments].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
@@ -19,6 +21,14 @@ export function Payments() {
           <BtnIcon icon="wallet">Record payment</BtnIcon>
         </button>
       </div>
+
+      <section className="kpi-grid kpi-grid--2">
+        <KpiCard
+          label="Collected this month"
+          value={formatCurrency(collectedMtd)}
+          variant="success"
+        />
+      </section>
 
       {sortedPayments.length === 0 ? (
         <p className="empty-inline">No payments</p>

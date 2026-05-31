@@ -30,8 +30,7 @@ export function Partners() {
         </button>
       </div>
 
-      <section className="kpi-grid kpi-grid--3">
-        <KpiCard label="Active partners" value={stats.activePartners} />
+      <section className="kpi-grid kpi-grid--2">
         <KpiCard label="Deployed" value={formatCurrency(stats.totalDeployed)} variant="accent" />
         <KpiCard
           label="Partner interest"

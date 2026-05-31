@@ -835,8 +835,6 @@ export function getPartnerPortfolioStats(partners: Partner[], loans: Loan[]) {
     0,
   )
   return {
-    totalPartners: partners.length,
-    activePartners: active.length,
     totalDeployed,
     totalInterestDue,
   }
