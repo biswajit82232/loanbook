@@ -25,10 +25,10 @@ export function Toast() {
       className={`toast toast--${toast.variant}`}
       role={toast.variant === 'error' ? 'alert' : 'status'}
     >
-      <Icon name={ICON_BY_VARIANT[toast.variant]} size={20} className="toast-icon" />
+      <Icon name={ICON_BY_VARIANT[toast.variant]} size={14} className="toast-icon" />
       <span className="toast-message">{toast.message}</span>
       <button type="button" className="toast-close" onClick={clearToast} aria-label="Dismiss">
-        <Icon name="x" size={18} />
+        <Icon name="x" size={14} />
       </button>
     </div>
   )

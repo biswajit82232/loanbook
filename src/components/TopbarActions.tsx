@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { BorrowerContactButtons } from './BorrowerContactButtons'
 import { useLoanBook } from '../context/LoanBookContext'
 import { useNavigation } from '../context/NavigationContext'
+import { applyAppUpdate, subscribeAppUpdate } from '../lib/pwa-update'
 import {
   formatReminderPeriodLabel,
   getAnchorLabel,
@@ -21,14 +22,19 @@ export function TopbarActions() {
   const { loans, settings, getBorrower, getLoansByBorrower, dismissReminder, showToast } =
     useLoanBook()
   const [notifyOpen, setNotifyOpen] = useState(false)
+  const [updateAvailable, setUpdateAvailable] = useState(false)
+  const [reloading, setReloading] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => subscribeAppUpdate(setUpdateAvailable), [])
 
   const dismissed = useMemo(
     () => new Set(settings.reminderDismissed),
     [settings.reminderDismissed],
   )
   const reminders = getMonthlyLoanReminders(loans, dismissed)
-  const showNotifications = page === 'dashboard' && !detail
+  const showNotifications = updateAvailable || (page === 'dashboard' && !detail)
+  const notifyBadgeCount = reminders.length + (updateAvailable ? 1 : 0)
 
   const loanDetail = detail?.type === 'loan' ? detail.id : undefined
   const borrowerDetail = detail?.type === 'borrower' ? detail.id : undefined
@@ -87,6 +93,17 @@ export function TopbarActions() {
     }
   }
 
+  async function reloadForUpdate() {
+    if (reloading) return
+    setReloading(true)
+    try {
+      await applyAppUpdate()
+    } catch {
+      showToast('Could not reload. Try closing and reopening the app.', 'warning')
+      setReloading(false)
+    }
+  }
+
   if (!showNotifications && !showContact) return null
 
   return (
@@ -101,24 +118,48 @@ export function TopbarActions() {
             type="button"
             className="topbar-icon-btn"
             onClick={() => setNotifyOpen((o) => !o)}
-            aria-label={`Monthly reminders${reminders.length ? `, ${reminders.length} active` : ''}`}
+            aria-label={`Notifications${
+              notifyBadgeCount ? `, ${notifyBadgeCount} item${notifyBadgeCount === 1 ? '' : 's'}` : ''
+            }`}
             aria-expanded={notifyOpen}
           >
             <Icon name="bell" size={22} />
-            {reminders.length > 0 && (
-              <span className="topbar-badge">{reminders.length > 9 ? '9+' : reminders.length}</span>
+            {notifyBadgeCount > 0 && (
+              <span className="topbar-badge">
+                {notifyBadgeCount > 9 ? '9+' : notifyBadgeCount}
+              </span>
             )}
           </button>
 
           {notifyOpen && (
-            <div className="topbar-notify-panel" role="dialog" aria-label="Monthly loan reminders">
+            <div className="topbar-notify-panel" role="dialog" aria-label="Notifications">
               <div className="topbar-notify-header">
-                <strong>Reminders</strong>
+                <strong>Notifications</strong>
               </div>
-              {reminders.length === 0 ? (
+              {updateAvailable && (
+                <div className="topbar-notify-update">
+                  <p className="topbar-notify-update-title">App update available</p>
+                  <p className="topbar-notify-update-sub">
+                    A new version of LoanBook is ready. Reload to use the latest features and fixes.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm topbar-notify-update-btn"
+                    disabled={reloading}
+                    onClick={() => void reloadForUpdate()}
+                  >
+                    {reloading ? 'Reloading…' : 'Reload app'}
+                  </button>
+                </div>
+              )}
+              {reminders.length === 0 && !updateAvailable ? (
                 <p className="topbar-notify-empty">None</p>
-              ) : (
-                <ul className="topbar-notify-list">
+              ) : reminders.length > 0 ? (
+                <>
+                  {updateAvailable && (
+                    <p className="topbar-notify-section-label">Loan reminders</p>
+                  )}
+                  <ul className="topbar-notify-list">
                   {reminders.map((r) => {
                     const borrower = getBorrower(r.borrowerId)
                     return (
@@ -159,7 +200,8 @@ export function TopbarActions() {
                     )
                   })}
                 </ul>
-              )}
+                </>
+              ) : null}
             </div>
           )}
         </div>

@@ -9,6 +9,11 @@ import {
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import type { LoadProgressUpdate } from '../data/load-progress'
+import {
+  isBrowserOffline,
+  readPersistedAuthSession,
+  resolveInitialSession,
+} from '../lib/auth-session'
 import { getAllowedEmail, isEmailAllowed, isSupabaseConfigured } from '../lib/env'
 import { getSupabase } from '../lib/supabase'
 
@@ -52,24 +57,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const supabase = getSupabase()
-    setLoadProgress({ percent: 15, label: 'Checking sign-in…' })
 
-    supabase.auth.getSession().then(({ data }) => {
-      setLoadProgress({ percent: 85, label: 'Restoring session…' })
-      setSession(rejectUnauthorizedSession(data.session))
-      setLoadProgress({ percent: 100, label: 'Ready' })
-      setLoading(false)
-    })
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const finishAuth = (nextSession: Session | null) => {
       setSession(rejectUnauthorizedSession(nextSession))
       setLoadProgress({ percent: 100, label: 'Ready' })
       setLoading(false)
-    })
+    }
 
-    return () => subscription.unsubscribe()
+    let subscription: { unsubscribe: () => void } | null = null
+
+    const wireAuthListener = () => {
+      if (subscription) return
+      const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+        finishAuth(nextSession)
+      })
+      subscription = data.subscription
+    }
+
+    const syncSessionFromCloud = () => {
+      setLoadProgress({ percent: 15, label: 'Checking sign-in…' })
+      void resolveInitialSession(() => supabase.auth.getSession()).then((cached) => {
+        setLoadProgress({ percent: 85, label: 'Restoring session…' })
+        finishAuth(cached)
+      })
+    }
+
+    if (isBrowserOffline()) {
+      setLoadProgress({ percent: 40, label: 'Offline — using saved sign-in…' })
+      finishAuth(readPersistedAuthSession())
+    } else {
+      wireAuthListener()
+      syncSessionFromCloud()
+    }
+
+    const onOnline = () => {
+      wireAuthListener()
+      syncSessionFromCloud()
+    }
+    window.addEventListener('online', onOnline)
+
+    return () => {
+      subscription?.unsubscribe()
+      window.removeEventListener('online', onOnline)
+    }
   }, [configured])
 
   const signIn = useCallback(async (email: string, password: string) => {
