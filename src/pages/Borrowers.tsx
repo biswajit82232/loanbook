@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react'
 import { BtnIcon } from '../components/BtnIcon'
+import { ListPagination } from '../components/ListPagination'
 import { CountBadge } from '../components/CountBadge'
+import { usePagination } from '../hooks/usePagination'
 import { SafeText } from '../components/SafeText'
 import { Icon } from '../components/icons'
 import {
+  compareBorrowerByLastEdited,
   formatCurrency,
   getBorrowerInterestDue,
   getBorrowerLoanCounts,
@@ -13,6 +16,7 @@ import {
 import { useNavigation } from '../context/NavigationContext'
 import { useLoanBook } from '../context/LoanBookContext'
 import { formatDisplayPhone, hasCallablePhone } from '../utils/phone'
+import type { Borrower, Loan } from '../data/types'
 
 function matchesBorrowerSearch(
   query: string,
@@ -31,19 +35,120 @@ function matchesBorrowerSearch(
   return false
 }
 
+function BorrowerPaginatedList({
+  borrowers,
+  loans,
+  onOpen,
+}: {
+  borrowers: Borrower[]
+  loans: Loan[]
+  onOpen: (id: string) => void
+}) {
+  const pagination = usePagination(borrowers)
+
+  return (
+    <>
+      <ListPagination
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        rangeLabel={pagination.rangeLabel}
+        canPrev={pagination.canPrev}
+        canNext={pagination.canNext}
+        onPrev={pagination.goPrev}
+        onNext={pagination.goNext}
+      />
+      <ul className="compact-list">
+        {pagination.pageItems.map((b) => {
+          const { total: loanCount, active: activeLoans } = getBorrowerLoanCounts(loans, b.id)
+          const totalDue = getBorrowerOutstanding(loans, b.id)
+          const principalDue = getBorrowerPrincipalDue(loans, b.id)
+          const interestDue = getBorrowerInterestDue(loans, b.id)
+
+          return (
+            <li key={b.id}>
+              <button
+                type="button"
+                className="compact-row compact-row--borrower"
+                onClick={() => onOpen(b.id)}
+              >
+                <span className="avatar avatar-sm" aria-hidden>
+                  {b.name.charAt(0).toUpperCase()}
+                </span>
+                <span className="compact-row-main">
+                  <span className="compact-row-top">
+                    <span className="compact-row-title-group">
+                      <SafeText as="span" className="compact-row-id">
+                        {b.name}
+                      </SafeText>
+                      {loanCount > 0 && (
+                        <CountBadge
+                          count={loanCount}
+                          label={`${loanCount} loan${loanCount === 1 ? '' : 's'}`}
+                        />
+                      )}
+                    </span>
+                    {totalDue > 0 ? (
+                      <span className="badge badge-due">Due</span>
+                    ) : activeLoans > 0 ? (
+                      <span className="badge badge-active">Active</span>
+                    ) : loanCount > 0 ? (
+                      <span className="badge badge-closed">Clear</span>
+                    ) : (
+                      <span className="badge badge-pending">No loans</span>
+                    )}
+                  </span>
+                  <span className="compact-row-mid">
+                    <span
+                      className={`compact-row-name${!hasCallablePhone(b.phone) ? ' compact-row-name--muted' : ''}`}
+                    >
+                      {formatDisplayPhone(b.phone)}
+                    </span>
+                    <span className="compact-row-dot">·</span>
+                    <span className="compact-row-days">{b.id}</span>
+                  </span>
+                  <span className="compact-row-bottom">
+                    {totalDue > 0 ? (
+                      <>
+                        <SafeText variant="amount">{formatCurrency(totalDue)} due</SafeText>
+                        {interestDue > 0 && (
+                          <SafeText as="span" className="compact-row-interest" variant="amount">
+                            {formatCurrency(principalDue)} prin. · {formatCurrency(interestDue)} int.
+                          </SafeText>
+                        )}
+                      </>
+                    ) : (
+                      <span className="compact-row-muted">No balance due</span>
+                    )}
+                  </span>
+                </span>
+                <Icon name="chevron-right" size={20} className="compact-row-chevron" />
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      <ListPagination
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        rangeLabel={pagination.rangeLabel}
+        canPrev={pagination.canPrev}
+        canNext={pagination.canNext}
+        onPrev={pagination.goPrev}
+        onNext={pagination.goNext}
+      />
+    </>
+  )
+}
+
 export function Borrowers() {
   const { openDetail, openBorrowerForm } = useNavigation()
   const { borrowers, loans } = useLoanBook()
   const [search, setSearch] = useState('')
 
-  const sortedBorrowers = useMemo(() => {
-    return [...borrowers].sort((a, b) => {
-      const dueA = getBorrowerOutstanding(loans, a.id)
-      const dueB = getBorrowerOutstanding(loans, b.id)
-      if (dueB !== dueA) return dueB - dueA
-      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-    })
-  }, [borrowers, loans])
+  const sortedBorrowers = useMemo(
+    () => [...borrowers].sort(compareBorrowerByLastEdited),
+    [borrowers],
+  )
 
   const visibleBorrowers = useMemo(
     () =>
@@ -68,14 +173,10 @@ export function Borrowers() {
       {borrowers.length > 0 && (
         <label className="list-search field">
           <span className="visually-hidden">Search borrowers</span>
-          <span className="list-search-icon" aria-hidden>
-            <Icon name="search" size={18} />
-          </span>
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, phone, or ID…"
             autoComplete="off"
             enterKeyHint="search"
           />
@@ -97,80 +198,12 @@ export function Borrowers() {
       ) : visibleBorrowers.length === 0 ? (
         <p className="empty-inline">No results</p>
       ) : (
-        <ul className="compact-list">
-          {visibleBorrowers.map((b) => {
-            const { total: loanCount, active: activeLoans } = getBorrowerLoanCounts(
-              loans,
-              b.id,
-            )
-            const totalDue = getBorrowerOutstanding(loans, b.id)
-            const principalDue = getBorrowerPrincipalDue(loans, b.id)
-            const interestDue = getBorrowerInterestDue(loans, b.id)
-
-            return (
-              <li key={b.id}>
-                <button
-                  type="button"
-                  className="compact-row compact-row--borrower"
-                  onClick={() => openDetail({ type: 'borrower', id: b.id })}
-                >
-                  <span className="avatar avatar-sm" aria-hidden>
-                    {b.name.charAt(0).toUpperCase()}
-                  </span>
-                  <span className="compact-row-main">
-                    <span className="compact-row-top">
-                      <span className="compact-row-title-group">
-                        <SafeText as="span" className="compact-row-id">
-                          {b.name}
-                        </SafeText>
-                        {loanCount > 0 && (
-                          <CountBadge
-                            count={loanCount}
-                            label={`${loanCount} loan${loanCount === 1 ? '' : 's'}`}
-                          />
-                        )}
-                      </span>
-                      {totalDue > 0 ? (
-                        <span className="badge badge-due">Due</span>
-                      ) : activeLoans > 0 ? (
-                        <span className="badge badge-active">Active</span>
-                      ) : loanCount > 0 ? (
-                        <span className="badge badge-closed">Clear</span>
-                      ) : (
-                        <span className="badge badge-pending">No loans</span>
-                      )}
-                    </span>
-                    <span className="compact-row-mid">
-                      <span
-                        className={`compact-row-name${!hasCallablePhone(b.phone) ? ' compact-row-name--muted' : ''}`}
-                      >
-                        {formatDisplayPhone(b.phone)}
-                      </span>
-                      <span className="compact-row-dot">·</span>
-                      <span className="compact-row-days">{b.id}</span>
-                    </span>
-                    <span className="compact-row-bottom">
-                      {totalDue > 0 ? (
-                        <>
-                          <SafeText variant="amount">{formatCurrency(totalDue)} due</SafeText>
-                          {interestDue > 0 && (
-                            <SafeText as="span" className="compact-row-interest" variant="amount">
-                              {formatCurrency(principalDue)} prin. · {formatCurrency(interestDue)}{' '}
-                              int.
-                            </SafeText>
-                          )}
-                        </>
-                      ) : (
-                        <span className="compact-row-muted">No balance due</span>
-                      )}
-                    </span>
-                  </span>
-                  <Icon name="chevron-right" size={20} className="compact-row-chevron" />
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+        <BorrowerPaginatedList
+          key={search}
+          borrowers={visibleBorrowers}
+          loans={loans}
+          onOpen={(id) => openDetail({ type: 'borrower', id })}
+        />
       )}
     </div>
   )

@@ -19,7 +19,13 @@ export type DetailRoute =
   | { type: 'partner'; id: string }
   | { type: 'payment'; id: string }
   | { type: 'report'; id: string }
-  | { type: 'record-payment'; loanId?: string; paymentType?: PaymentType }
+  | {
+      type: 'record-payment'
+      scope?: 'loan' | 'borrower_interest'
+      loanId?: string
+      borrowerId?: string
+      paymentType?: PaymentType
+    }
   | { type: 'loan-form'; mode: 'create'; borrowerId?: string }
   | { type: 'loan-form'; mode: 'edit'; id: string }
   | { type: 'borrower-form'; mode: 'create' }
@@ -41,7 +47,11 @@ interface NavigationContextValue {
   canGoBack: boolean
   setPage: (page: PageId) => void
   openDetail: (route: DetailRoute) => void
-  openPaymentForm: (opts?: { loanId?: string; type?: PaymentType }) => void
+  openPaymentForm: (opts?: {
+    loanId?: string
+    borrowerId?: string
+    type?: PaymentType
+  }) => void
   openLoanForm: (opts: {
     mode: 'create' | 'edit'
     loanId?: string
@@ -98,8 +108,12 @@ function historyUrl(page: PageId, detail: DetailRoute | null): string {
       return `${base}#/reports/report/${detail.id}`
     case 'record-payment': {
       let path = `${base}#/payments/record`
-      if (detail.loanId) path += `/${detail.loanId}`
-      if (detail.paymentType) path += `/${detail.paymentType}`
+      if (detail.scope === 'borrower_interest' && detail.borrowerId) {
+        path += `/borrower/${detail.borrowerId}`
+      } else {
+        if (detail.loanId) path += `/${detail.loanId}`
+        if (detail.paymentType) path += `/${detail.paymentType}`
+      }
       return path
     }
     case 'loan-form':
@@ -130,11 +144,19 @@ function parseDetailRoute(page: PageId, parts: string[]): DetailRoute | null {
   if (parts.length === 0) return null
 
   if (parts[0] === 'record') {
+    if (parts[1] === 'borrower' && parts[2]) {
+      return {
+        type: 'record-payment',
+        scope: 'borrower_interest',
+        borrowerId: parts[2],
+      }
+    }
     const rawType = parts[2]
     const paymentType: PaymentType | undefined =
       rawType === 'interest_only' || rawType === 'full_settlement' ? rawType : undefined
     return {
       type: 'record-payment',
+      scope: 'loan',
       loanId: parts[1],
       paymentType,
     }
@@ -259,6 +281,10 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
           return month ? month.title : 'Report'
         }
         case 'record-payment':
+          if (d.scope === 'borrower_interest' && d.borrowerId) {
+            const borrower = getBorrower(d.borrowerId)
+            return borrower ? `Interest · ${borrower.name}` : 'Borrower interest'
+          }
           return 'Record payment'
         case 'loan-form':
           return d.mode === 'create' ? 'New loan' : `Edit ${d.id}`
@@ -308,9 +334,18 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   )
 
   const openPaymentForm = useCallback(
-    (opts?: { loanId?: string; type?: PaymentType }) => {
+    (opts?: { loanId?: string; borrowerId?: string; type?: PaymentType }) => {
+      if (opts?.borrowerId) {
+        navigateTo({
+          type: 'record-payment',
+          scope: 'borrower_interest',
+          borrowerId: opts.borrowerId,
+        })
+        return
+      }
       navigateTo({
         type: 'record-payment',
+        scope: 'loan',
         loanId: opts?.loanId,
         paymentType: opts?.type,
       })

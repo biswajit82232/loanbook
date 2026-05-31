@@ -3,9 +3,8 @@ import { Icon } from '../components/icons'
 import { useNavigation } from '../context/NavigationContext'
 import { useLoanBook } from '../context/LoanBookContext'
 import { KpiCard } from '../components/KpiCard'
-import { SafeAmount } from '../components/SafeAmount'
 import { SafeText } from '../components/SafeText'
-import { formatCurrency, getPaymentTypeLabel, getPortfolioStats } from '../data/helpers'
+import { formatCurrency, getPaymentTypeLabel, getPortfolioStats, parseAppDate } from '../data/helpers'
 import {
   getDashboardAttentionItems,
   type DashboardAttentionItem,
@@ -32,8 +31,8 @@ export function Dashboard() {
 
   const recentPayments = [...payments]
     .sort((a, b) => {
-      const ta = new Date(a.date).getTime()
-      const tb = new Date(b.date).getTime()
+      const ta = parseAppDate(a.date)?.getTime() ?? 0
+      const tb = parseAppDate(b.date)?.getTime() ?? 0
       return tb - ta || b.id.localeCompare(a.id)
     })
     .slice(0, 5)
@@ -60,63 +59,53 @@ export function Dashboard() {
         </header>
 
         {attentionItems.length === 0 ? (
-          <div className="attention-empty">
-            <span className="attention-empty-icon" aria-hidden>
-              <Icon name="check-circle" size={24} />
-            </span>
-            <p className="attention-empty-title">All caught up</p>
-          </div>
+          <p className="attention-empty">
+            <Icon name="check-circle" size={16} aria-hidden />
+            <span>All caught up</span>
+          </p>
         ) : (
-          <ul className="attention-cards">
-            {attentionItems.map((item) => (
-              <li key={item.id}>
-                <article
-                  className={`attention-card attention-card--${item.kind === 'payment_due' ? 'due' : 'pending'}`}
-                >
+          <ul className="compact-list attention-list">
+            {attentionItems.map((item) => {
+              const typeBadge = item.kind === 'payment_due' ? 'due' : 'pending'
+              return (
+                <li key={item.id} className="attention-list-item">
+                  <button
+                    type="button"
+                    className={`compact-row attention-row attention-row--${typeBadge}`}
+                    onClick={() => openDetail({ type: 'loan', id: item.loanId })}
+                  >
+                    <div className="compact-row-top">
+                      <SafeText as="span" className="compact-row-id">
+                        {item.borrowerName}
+                      </SafeText>
+                      <span className={`badge badge-${typeBadge}`}>
+                        {attentionKindLabel(item.kind)}
+                      </span>
+                    </div>
+                    <div className="compact-row-mid">
+                      <span>{item.reason}</span>
+                      <span className="compact-row-dot">·</span>
+                      <span className="compact-row-days">{item.context}</span>
+                    </div>
+                    <div className="compact-row-bottom">
+                      <SafeText variant="amount">{formatCurrency(item.amount)}</SafeText>
+                      <span className="compact-row-interest">{item.amountCaption}</span>
+                    </div>
+                  </button>
                   {item.dismissKey && (
                     <button
                       type="button"
-                      className="attention-card-dismiss"
+                      className="attention-row-dismiss"
                       onClick={() => dismissReminder(item.dismissKey!)}
                       aria-label={`Dismiss reminder for ${item.borrowerName}`}
                       title="Dismiss"
                     >
-                      <Icon name="x" size={16} />
+                      <Icon name="x" size={14} />
                     </button>
                   )}
-
-                  <button
-                    type="button"
-                    className="attention-card-body"
-                    onClick={() => openDetail({ type: 'loan', id: item.loanId })}
-                  >
-                    <div className="attention-card-meta-row">
-                      <span
-                        className={`attention-card-badge attention-card-badge--${item.kind === 'payment_due' ? 'due' : 'pending'}`}
-                      >
-                        {attentionKindLabel(item.kind)}
-                      </span>
-                      <Icon name="chevron-right" size={18} className="attention-card-chevron" />
-                    </div>
-
-                    <SafeText as="h3" className="attention-card-name">
-                      {item.borrowerName}
-                    </SafeText>
-                    <SafeText as="p" className="attention-card-reason">
-                      {item.reason}
-                    </SafeText>
-                    <SafeText as="p" className="attention-card-context">
-                      {item.context}
-                    </SafeText>
-
-                    <div className="attention-card-amount-block">
-                      <SafeAmount amount={item.amount} className="attention-card-amount" />
-                      <span className="attention-card-amount-caption">{item.amountCaption}</span>
-                    </div>
-                  </button>
-                </article>
-              </li>
-            ))}
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>
@@ -135,7 +124,7 @@ export function Dashboard() {
                   onClick={() => openDetail({ type: 'payment', id: p.id })}
                 >
                   <span className="activity-icon activity-icon--collected" aria-hidden>
-                    <Icon name="receipt" size={18} />
+                    <Icon name="banknote" size={18} />
                   </span>
                   <div>
                     <SafeText as="strong">{getPaymentTypeLabel(p.type)}</SafeText>

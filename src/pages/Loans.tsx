@@ -1,4 +1,6 @@
+import { useMemo } from 'react'
 import {
+  compareLoanByStartDateNewest,
   formatCurrency,
   formatDaysLent,
   getBuiltUpInterest,
@@ -6,13 +8,22 @@ import {
   getLoanListAmountLabel,
 } from '../data/helpers'
 import { BtnIcon } from '../components/BtnIcon'
+import { ListPagination } from '../components/ListPagination'
 import { SafeText } from '../components/SafeText'
+import { usePagination } from '../hooks/usePagination'
 import { useNavigation } from '../context/NavigationContext'
 import { useLoanBook } from '../context/LoanBookContext'
 
 export function Loans() {
   const { openDetail, openLoanForm } = useNavigation()
   const { loans, getBorrower } = useLoanBook()
+
+  const sortedLoans = useMemo(
+    () => [...loans].sort(compareLoanByStartDateNewest),
+    [loans],
+  )
+
+  const pagination = usePagination(sortedLoans)
 
   return (
     <div className="page">
@@ -25,8 +36,18 @@ export function Loans() {
       {loans.length === 0 ? (
         <p className="empty-inline">No loans</p>
       ) : (
-        <ul className="compact-list">
-          {loans.map((loan) => {
+        <>
+          <ListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            rangeLabel={pagination.rangeLabel}
+            canPrev={pagination.canPrev}
+            canNext={pagination.canNext}
+            onPrev={pagination.goPrev}
+            onNext={pagination.goNext}
+          />
+          <ul className="compact-list">
+            {pagination.pageItems.map((loan) => {
             const borrower = getBorrower(loan.borrowerId)
             const days = formatDaysLent(getLoanLentDays(loan), loan)
             const interest =
@@ -68,8 +89,18 @@ export function Loans() {
                 </button>
               </li>
             )
-          })}
-        </ul>
+            })}
+          </ul>
+          <ListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            rangeLabel={pagination.rangeLabel}
+            canPrev={pagination.canPrev}
+            canNext={pagination.canNext}
+            onPrev={pagination.goPrev}
+            onNext={pagination.goNext}
+          />
+        </>
       )}
     </div>
   )

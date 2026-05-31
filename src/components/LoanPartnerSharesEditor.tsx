@@ -30,7 +30,6 @@ export function LoanPartnerSharesEditor({
   partners,
   shares,
   onChange,
-  loanPrincipal: _loanPrincipal,
   defaultRate,
   defaultRatePeriod,
   disabled,
@@ -69,7 +68,6 @@ export function LoanPartnerSharesEditor({
     <div className="field-group partner-shares-section">
       <div className="field-group-header">
         <span className="field-label">Partners</span>
-        <span className="field-hint">Amount is capital contributed; interest uses each rate on full loan outstanding.</span>
       </div>
 
       {shares.map((row, index) => {

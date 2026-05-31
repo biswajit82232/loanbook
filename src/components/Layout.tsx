@@ -5,13 +5,22 @@ import { SafeText } from './SafeText'
 import { Icon } from './icons'
 import { Sidebar } from './Sidebar'
 import { TopbarActions } from './TopbarActions'
+import { useAuth } from '../context/AuthContext'
 import { useLoanBook } from '../context/LoanBookContext'
 import { useNavigation } from '../context/NavigationContext'
+import { isSupabaseConfigured } from '../lib/env'
 import { NAV_ITEMS } from '../constants/navigation'
+import { SyncStatusDot } from './SyncStatusDot'
+import { PageView } from './PageView'
+import { getNavigationViewKey } from '../utils/viewKey'
 
 export function Layout({ children }: { children: ReactNode }) {
-  const { settings, loans } = useLoanBook()
+  const { user } = useAuth()
+  const { settings, loans, syncStatus, syncStatusLabel, syncPending, retrySync } =
+    useLoanBook()
   const { page, title, canGoBack, detail, setPage, goBack } = useNavigation()
+  const viewKey = getNavigationViewKey(page, detail)
+  const showSyncDot = isSupabaseConfigured() && Boolean(user)
   const loanCount = loans.length
 
   const topbarLoanCount = useMemo(() => {
@@ -85,11 +94,21 @@ export function Layout({ children }: { children: ReactNode }) {
             {topbarLoanCount !== undefined && (
               <CountBadge count={topbarLoanCount} label={`${topbarLoanCount} loans`} />
             )}
+            {showSyncDot && (
+              <SyncStatusDot
+                status={syncStatus}
+                pending={syncPending}
+                label={syncStatusLabel}
+                onRetry={retrySync}
+              />
+            )}
           </h1>
           <TopbarActions />
         </header>
 
-        <main className="main-content">{children}</main>
+        <main className="main-content">
+          <PageView viewKey={viewKey}>{children}</PageView>
+        </main>
       </div>
     </div>
   )

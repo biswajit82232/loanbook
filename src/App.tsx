@@ -12,6 +12,7 @@ import { Payments } from './pages/Payments'
 import { Reports } from './pages/Reports'
 import { Settings } from './pages/Settings'
 import { Login } from './pages/Login'
+import { AppLoading } from './components/AppLoading'
 
 function PageContent() {
   const { page, detail } = useNavigation()
@@ -41,13 +42,11 @@ function PageContent() {
 }
 
 function AppMain() {
-  const { dataLoading, dataReady } = useLoanBook()
+  const { dataLoading, dataReady, loadProgress } = useLoanBook()
 
   if (dataLoading || !dataReady) {
     return (
-      <div className="app-loading">
-        <p>Loading…</p>
-      </div>
+      <AppLoading percent={loadProgress.percent} label={loadProgress.label} />
     )
   }
 
@@ -62,13 +61,11 @@ function AppMain() {
 }
 
 function AppGate() {
-  const { session, loading, isConfigured } = useAuth()
+  const { session, loading, isConfigured, loadProgress } = useAuth()
 
   if (loading) {
     return (
-      <div className="app-loading">
-        <p>Loading…</p>
-      </div>
+      <AppLoading percent={loadProgress.percent} label={loadProgress.label} />
     )
   }
 

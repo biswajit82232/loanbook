@@ -55,6 +55,9 @@ export function LoanFormPage({ mode, loanId, borrowerId: presetBorrowerId }: Loa
     isEdit && existing ? toInputDateFromDisplay(existing.startDate) : toInputDate(new Date()),
   )
   const [purpose, setPurpose] = useState(() => (isEdit && existing ? existing.purpose : ''))
+  const [description, setDescription] = useState(
+    () => (isEdit && existing ? existing.description : ''),
+  )
   const [status, setStatus] = useState<'Active' | 'Pending'>(() =>
     isEdit && existing && existing.status === 'Pending' ? 'Pending' : 'Active',
   )
@@ -118,6 +121,7 @@ export function LoanFormPage({ mode, loanId, borrowerId: presetBorrowerId }: Loa
         loanId: existing.id,
         borrowerId: isClosed ? undefined : borrowerId,
         purpose,
+        description,
         rate: isClosed ? undefined : rateNum,
         ratePeriod: isClosed ? undefined : ratePeriod,
         startDate: isClosed ? undefined : formatDisplayDateFromInput(startDate),
@@ -138,6 +142,7 @@ export function LoanFormPage({ mode, loanId, borrowerId: presetBorrowerId }: Loa
       ratePeriod,
       startDate: formatDisplayDateFromInput(startDate),
       purpose,
+      description,
       status,
       initialAccruedInterest: 0,
       partnerShares: validShares,
@@ -260,6 +265,15 @@ export function LoanFormPage({ mode, loanId, borrowerId: presetBorrowerId }: Loa
             type="text"
             value={purpose}
             onChange={(e) => setPurpose(e.target.value)}
+          />
+        </label>
+
+        <label className="field">
+          <span className="field-label">Description</span>
+          <textarea
+            rows={4}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
           />
         </label>
 

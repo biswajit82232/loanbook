@@ -16,7 +16,7 @@ export function LinkCard({ title, subtitle, meta, route }: LinkCardProps) {
   return (
     <button
       type="button"
-      className="link-card"
+      className="link-card pressable"
       onClick={() => openDetail(route)}
     >
       <div className="link-card-body">

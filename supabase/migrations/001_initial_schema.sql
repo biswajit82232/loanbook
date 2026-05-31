@@ -7,6 +7,7 @@ create table if not exists public.borrowers (
   phone text not null default '',
   address text not null default '',
   joined_date text not null,
+  updated_at text,
   notes text not null default '',
   created_at timestamptz not null default now(),
   primary key (user_id, id)
@@ -35,6 +36,7 @@ create table if not exists public.loans (
   start_date text not null,
   status text not null check (status in ('Active', 'Pending', 'Closed')),
   purpose text not null default '',
+  description text not null default '',
   accrued_interest numeric not null default 0,
   interest_collected numeric not null default 0,
   last_payment_date text,

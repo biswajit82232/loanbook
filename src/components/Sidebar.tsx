@@ -1,3 +1,5 @@
+import { BRAND_ICON_192 } from '../constants/brand'
+import { APP_VERSION } from '../lib/version'
 import { NavIcon } from './icons'
 import type { NavItem, PageId } from '../data/types'
 
@@ -29,10 +31,9 @@ export function Sidebar({
       />
       <aside className={`sidebar ${isOpen ? 'open' : ''}`} aria-label="Main navigation">
         <div className="sidebar-brand">
-          <img src="/icon-192.png" alt="" width={36} height={36} className="sidebar-brand-logo" />
+          <img src={BRAND_ICON_192} alt="" width={36} height={36} className="sidebar-brand-logo" />
           <div className="brand-text">
             <span className="brand-name">{displayName}</span>
-            <span className="brand-tagline">Loan management</span>
           </div>
         </div>
 
@@ -55,6 +56,8 @@ export function Sidebar({
             </button>
           ))}
         </nav>
+
+        <p className="sidebar-version">Version {APP_VERSION}</p>
       </aside>
     </>
   )

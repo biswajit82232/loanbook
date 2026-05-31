@@ -1,5 +1,6 @@
 import type {
   Borrower,
+  BorrowerInterestAllocation,
   CreateBorrowerInput,
   CreateLoanInput,
   CreatePartnerInput,
@@ -49,24 +50,84 @@ export function normalizePartner(
   }
 }
 
-export function normalizeBorrower(borrower: Borrower & { email?: string }): Borrower {
+export function normalizeBorrower(
+  borrower: Borrower & { email?: string; updatedAt?: string },
+): Borrower {
   return {
     id: borrower.id,
     name: borrower.name,
     phone: borrower.phone ?? '',
     address: borrower.address ?? '—',
     joinedDate: borrower.joinedDate,
+    updatedAt: borrower.updatedAt ?? borrower.joinedDate,
     notes: borrower.notes ?? '',
   }
+}
+
+export function compareBorrowerByLastEdited(a: Borrower, b: Borrower): number {
+  const ta = parseAppDate(a.updatedAt)?.getTime() ?? 0
+  const tb = parseAppDate(b.updatedAt)?.getTime() ?? 0
+  if (tb !== ta) return tb - ta
+  return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+}
+
+export function compareLoanByStartDateNewest(a: Loan, b: Loan): number {
+  const ta = parseAppDate(a.startDate)?.getTime() ?? 0
+  const tb = parseAppDate(b.startDate)?.getTime() ?? 0
+  if (tb !== ta) return tb - ta
+  return b.id.localeCompare(a.id)
 }
 
 export function getPaymentTypeLabel(type: PaymentType): string {
   return type === 'interest_only' ? 'Interest only' : 'Full settlement'
 }
 
-function parseAppDate(dateStr: string): Date | null {
-  const parsed = new Date(dateStr)
+export function parseAppDate(dateStr: string): Date | null {
+  const trimmed = dateStr?.trim()
+  if (!trimmed) return null
+
+  // ISO / yyyy-mm-dd parses reliably
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    const iso = new Date(trimmed)
+    return Number.isNaN(iso.getTime()) ? null : iso
+  }
+
+  // Display format from formatDisplayDate: "15 Jan 2024"
+  const displayMatch = trimmed.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})$/)
+  if (displayMatch) {
+    const [, day, monthStr, year] = displayMatch
+    const months: Record<string, number> = {
+      jan: 0,
+      feb: 1,
+      mar: 2,
+      apr: 3,
+      may: 4,
+      jun: 5,
+      jul: 6,
+      aug: 7,
+      sep: 8,
+      oct: 9,
+      nov: 10,
+      dec: 11,
+    }
+    const month = months[monthStr.slice(0, 3).toLowerCase()]
+    if (month !== undefined) {
+      const parsed = new Date(Number(year), month, Number(day))
+      return Number.isNaN(parsed.getTime()) ? null : parsed
+    }
+  }
+
+  const parsed = new Date(trimmed)
   return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+export function nextPaymentId(payments: Payment[]): string {
+  const taken = new Set(payments.map((p) => p.id))
+  let id: string
+  do {
+    id = `PY-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  } while (taken.has(id))
+  return id
 }
 
 export function formatDisplayDate(date: Date = new Date()): string {
@@ -258,7 +319,7 @@ export function getLoanListAmountLabel(loan: Loan): string {
   return formatCurrency(loan.principal ?? 0)
 }
 
-export function normalizeLoan(loan: Loan): Loan {
+export function normalizeLoan(loan: Loan & { description?: string }): Loan {
   let normalized: Loan = {
     ...loan,
     principalOutstanding: loan.principalOutstanding ?? loan.principal ?? 0,
@@ -266,6 +327,7 @@ export function normalizeLoan(loan: Loan): Loan {
     interestCollected: loan.interestCollected ?? 0,
     interestLog: loan.interestLog ?? [],
     partnerShares: migratePartnerShares(loan),
+    description: loan.description?.trim() ?? '',
   }
   if (normalized.status === 'Active') {
     normalized = collapseOutstandingInterestLog(normalized)
@@ -522,6 +584,82 @@ export function getBorrowerInterestDue(loans: Loan[], borrowerId: string): numbe
     .reduce((sum, l) => sum + getBuiltUpInterest(l), 0)
 }
 
+/** Anchor used to order interest payments (oldest unpaid accrual first). */
+function loanInterestAnchorTime(loan: Loan): number {
+  const anchor = loan.lastPaymentDate ?? loan.startDate
+  return parseAppDate(anchor)?.getTime() ?? 0
+}
+
+export type PlanBorrowerInterestPaymentResult =
+  | {
+      ok: true
+      allocations: BorrowerInterestAllocation[]
+      totalDue: number
+    }
+  | { ok: false; error: string }
+
+/**
+ * Split a borrower interest payment across active loans (interest-only).
+ * Waterfall: loans with the oldest payment anchor first, then by loan id.
+ */
+export function planBorrowerInterestPayment(
+  loans: Loan[],
+  borrowerId: string,
+  amount: number,
+): PlanBorrowerInterestPaymentResult {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, error: 'Enter an amount greater than zero.' }
+  }
+
+  const active = loans.filter(
+    (l) => l.borrowerId === borrowerId && l.status === 'Active',
+  )
+  if (active.length === 0) {
+    return { ok: false, error: 'No active loans for this borrower.' }
+  }
+
+  const withDue = active
+    .map((loan) => ({ loan, due: getBuiltUpInterest(loan) }))
+    .filter((row) => row.due > 0)
+
+  const totalDue = withDue.reduce((sum, row) => sum + row.due, 0)
+  if (totalDue <= 0) {
+    return { ok: false, error: 'No interest due on active loans.' }
+  }
+
+  if (amount > totalDue) {
+    return {
+      ok: false,
+      error: `Amount cannot exceed total interest due (${formatCurrency(totalDue)}).`,
+    }
+  }
+
+  const sorted = [...withDue].sort((a, b) => {
+    const ta = loanInterestAnchorTime(a.loan)
+    const tb = loanInterestAnchorTime(b.loan)
+    if (ta !== tb) return ta - tb
+    return a.loan.id.localeCompare(b.loan.id)
+  })
+
+  let remaining = amount
+  const allocations: BorrowerInterestAllocation[] = []
+
+  for (const { loan, due } of sorted) {
+    if (remaining <= 0) break
+    const pay = Math.min(remaining, due)
+    if (pay > 0) {
+      allocations.push({ loanId: loan.id, amount: pay })
+      remaining -= pay
+    }
+  }
+
+  if (allocations.length === 0) {
+    return { ok: false, error: 'No interest could be allocated.' }
+  }
+
+  return { ok: true, allocations, totalDue }
+}
+
 export function getBorrowerLoanCounts(loans: Loan[], borrowerId: string) {
   const borrowerLoans = loans.filter((l) => l.borrowerId === borrowerId)
   const active = borrowerLoans.filter((l) => l.status === 'Active').length
@@ -618,7 +756,7 @@ export function validateUpdateLoan(
       input.ratePeriod !== undefined ||
       input.startDate !== undefined
     ) {
-      return 'Closed loans can only have purpose updated.'
+      return 'Closed loans can only have purpose and description updated.'
     }
     return null
   }

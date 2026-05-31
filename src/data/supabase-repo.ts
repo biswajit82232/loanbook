@@ -1,6 +1,8 @@
 import { getSupabase } from '../lib/supabase'
 import { normalizeBorrower, normalizeLoan, normalizePartner } from './helpers'
 import { defaultSettings, normalizeSettings } from './settings'
+import type { LoadProgressReporter } from './load-progress'
+import { clampLoadPercent } from './load-progress'
 import type {
   AppSettings,
   Borrower,
@@ -23,6 +25,7 @@ type BorrowerRow = {
   phone: string
   address: string
   joined_date: string
+  updated_at?: string | null
   notes: string
 }
 
@@ -45,6 +48,7 @@ type LoanRow = {
   start_date: string
   status: Loan['status']
   purpose: string
+  description?: string | null
   accrued_interest: number
   interest_collected: number
   last_payment_date: string | null
@@ -73,6 +77,7 @@ function mapBorrower(row: BorrowerRow): Borrower {
     phone: row.phone,
     address: row.address,
     joinedDate: row.joined_date,
+    updatedAt: row.updated_at ?? row.joined_date,
     notes: row.notes,
   })
 }
@@ -99,6 +104,7 @@ function mapLoan(row: LoanRow): Loan {
     startDate: row.start_date,
     status: row.status,
     purpose: row.purpose,
+    description: row.description ?? '',
     accruedInterest: Number(row.accrued_interest),
     interestCollected: Number(row.interest_collected),
     lastPaymentDate: row.last_payment_date ?? undefined,
@@ -123,15 +129,52 @@ function mapPayment(row: PaymentRow): Payment {
   }
 }
 
-export async function fetchLoanBook(userId: string): Promise<LoadedLoanBook> {
+export async function fetchLoanBook(
+  userId: string,
+  onProgress?: LoadProgressReporter,
+): Promise<LoadedLoanBook> {
   const supabase = getSupabase()
+  let maxPercent = 0
+
+  const tick = (percent: number, label: string) => {
+    maxPercent = Math.max(maxPercent, clampLoadPercent(percent))
+    onProgress?.({ percent: maxPercent, label })
+  }
+
+  tick(5, 'Connecting to cloud…')
+
+  const wrap = <T,>(
+    promise: PromiseLike<T>,
+    percent: number,
+    label: string,
+  ): Promise<T> =>
+    Promise.resolve(promise).then((result) => {
+      tick(percent, label)
+      return result
+    })
 
   const [borrowersRes, partnersRes, loansRes, paymentsRes, settingsRes] = await Promise.all([
-    supabase.from('borrowers').select('*').eq('user_id', userId),
-    supabase.from('partners').select('*').eq('user_id', userId),
-    supabase.from('loans').select('*').eq('user_id', userId),
-    supabase.from('payments').select('*').eq('user_id', userId),
-    supabase.from('user_settings').select('settings').eq('user_id', userId).maybeSingle(),
+    wrap(
+      supabase.from('borrowers').select('*').eq('user_id', userId),
+      22,
+      'Borrowers loaded',
+    ),
+    wrap(
+      supabase.from('partners').select('*').eq('user_id', userId),
+      40,
+      'Partners loaded',
+    ),
+    wrap(supabase.from('loans').select('*').eq('user_id', userId), 62, 'Loans loaded'),
+    wrap(
+      supabase.from('payments').select('*').eq('user_id', userId),
+      84,
+      'Payments loaded',
+    ),
+    wrap(
+      supabase.from('user_settings').select('settings').eq('user_id', userId).maybeSingle(),
+      94,
+      'Settings loaded',
+    ),
   ])
 
   if (borrowersRes.error) throw borrowersRes.error
@@ -139,6 +182,8 @@ export async function fetchLoanBook(userId: string): Promise<LoadedLoanBook> {
   if (loansRes.error) throw loansRes.error
   if (paymentsRes.error) throw paymentsRes.error
   if (settingsRes.error) throw settingsRes.error
+
+  tick(98, 'Preparing your book…')
 
   const settings = normalizeSettings(
     (settingsRes.data?.settings as Partial<AppSettings> | undefined) ?? defaultSettings,
@@ -155,6 +200,16 @@ export async function fetchLoanBook(userId: string): Promise<LoadedLoanBook> {
   }
 }
 
+function humanizeSyncError(message: string): string {
+  if (message.includes('updated_at') && message.includes('borrowers')) {
+    return `${message} — run supabase/migrations/apply_pending_migrations.sql in Supabase SQL Editor, then reload the app.`
+  }
+  if (message.includes('description') && message.includes('loans')) {
+    return `${message} — run supabase/migrations/apply_pending_migrations.sql in Supabase SQL Editor, then reload the app.`
+  }
+  return message
+}
+
 export async function syncLoanBook(
   userId: string,
   data: LoanBookData,
@@ -163,6 +218,27 @@ export async function syncLoanBook(
   const supabase = getSupabase()
   const normalized = normalizeSettings(settings)
 
+  const localRowCount =
+    data.borrowers.length +
+    data.partners.length +
+    data.loans.length +
+    data.payments.length
+
+  if (localRowCount === 0) {
+    const { data: remoteBorrowers, error: probeError } = await supabase
+      .from('borrowers')
+      .select('id')
+      .eq('user_id', userId)
+      .limit(1)
+    if (probeError) return { error: humanizeSyncError(probeError.message) }
+    if (remoteBorrowers && remoteBorrowers.length > 0) {
+      return {
+        error:
+          'Local data is empty but cloud has records — sync blocked to protect your data. Reload the app; if this persists, sign out and sign in again.',
+      }
+    }
+  }
+
   const borrowerRows = data.borrowers.map((b) => ({
     id: b.id,
     user_id: userId,
@@ -170,6 +246,7 @@ export async function syncLoanBook(
     phone: b.phone,
     address: b.address,
     joined_date: b.joinedDate,
+    updated_at: b.updatedAt,
     notes: b.notes,
   }))
 
@@ -194,6 +271,7 @@ export async function syncLoanBook(
     start_date: l.startDate,
     status: l.status,
     purpose: l.purpose,
+    description: l.description,
     accrued_interest: l.accruedInterest,
     interest_collected: l.interestCollected,
     last_payment_date: l.lastPaymentDate ?? null,
@@ -228,7 +306,7 @@ export async function syncLoanBook(
       .from(name)
       .select('id')
       .eq('user_id', userId)
-    if (listError) return { error: listError.message }
+    if (listError) return { error: humanizeSyncError(listError.message) }
 
     const toDelete = (existing ?? [])
       .map((row) => (row as { id: string }).id)
@@ -240,7 +318,7 @@ export async function syncLoanBook(
         .delete()
         .eq('user_id', userId)
         .in('id', toDelete)
-      if (delError) return { error: delError.message }
+      if (delError) return { error: humanizeSyncError(delError.message) }
     }
   }
 
@@ -248,28 +326,28 @@ export async function syncLoanBook(
     const { error } = await supabase.from('borrowers').upsert(borrowerRows, {
       onConflict: 'user_id,id',
     })
-    if (error) return { error: error.message }
+    if (error) return { error: humanizeSyncError(error.message) }
   }
 
   if (partnerRows.length > 0) {
     const { error } = await supabase.from('partners').upsert(partnerRows, {
       onConflict: 'user_id,id',
     })
-    if (error) return { error: error.message }
+    if (error) return { error: humanizeSyncError(error.message) }
   }
 
   if (loanRows.length > 0) {
     const { error } = await supabase.from('loans').upsert(loanRows, {
       onConflict: 'user_id,id',
     })
-    if (error) return { error: error.message }
+    if (error) return { error: humanizeSyncError(error.message) }
   }
 
   if (paymentRows.length > 0) {
     const { error } = await supabase.from('payments').upsert(paymentRows, {
       onConflict: 'user_id,id',
     })
-    if (error) return { error: error.message }
+    if (error) return { error: humanizeSyncError(error.message) }
   }
 
   const { error: settingsError } = await supabase.from('user_settings').upsert({
@@ -277,7 +355,7 @@ export async function syncLoanBook(
     settings: normalized,
     updated_at: new Date().toISOString(),
   })
-  if (settingsError) return { error: settingsError.message }
+  if (settingsError) return { error: humanizeSyncError(settingsError.message) }
 
   return { error: null }
 }

@@ -84,7 +84,7 @@ export function PartnerFormPage({ mode, partnerId }: PartnerFormPageProps) {
         </label>
         <label className="field">
           <span className="field-label">
-            Phone <span className="field-optional">(optional)</span>
+            Phone
           </span>
           <input
             type="tel"

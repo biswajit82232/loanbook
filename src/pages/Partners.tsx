@@ -1,4 +1,7 @@
+import { useMemo } from 'react'
 import { CountBadge } from '../components/CountBadge'
+import { ListPagination } from '../components/ListPagination'
+import { usePagination } from '../hooks/usePagination'
 import { SafeText } from '../components/SafeText'
 import {
   formatCurrency,
@@ -17,6 +20,12 @@ export function Partners() {
   const { openDetail, openPartnerForm } = useNavigation()
   const { partners, loans } = useLoanBook()
   const stats = getPartnerPortfolioStats(partners, loans)
+
+  const sortedPartners = useMemo(
+    () => [...partners].sort((a, b) => a.name.localeCompare(b.name)),
+    [partners],
+  )
+  const pagination = usePagination(sortedPartners)
 
   return (
     <div className="page">
@@ -42,8 +51,18 @@ export function Partners() {
       {partners.length === 0 ? (
         <p className="empty-inline">No partners</p>
       ) : (
-        <ul className="compact-list">
-          {partners.map((partner) => {
+        <>
+          <ListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            rangeLabel={pagination.rangeLabel}
+            canPrev={pagination.canPrev}
+            canNext={pagination.canNext}
+            onPrev={pagination.goPrev}
+            onNext={pagination.goNext}
+          />
+          <ul className="compact-list">
+            {pagination.pageItems.map((partner) => {
             const deployed = getPartnerPrincipalDeployed(partner.id, loans)
             const interestDue = getPartnerInterestDue(partner.id, loans)
             const partnerLoanCount = getLoansForPartner(partner.id, loans).length
@@ -85,8 +104,18 @@ export function Partners() {
                 </button>
               </li>
             )
-          })}
-        </ul>
+            })}
+          </ul>
+          <ListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            rangeLabel={pagination.rangeLabel}
+            canPrev={pagination.canPrev}
+            canNext={pagination.canNext}
+            onPrev={pagination.goPrev}
+            onNext={pagination.goNext}
+          />
+        </>
       )}
     </div>
   )

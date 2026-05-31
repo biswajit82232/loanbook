@@ -24,6 +24,8 @@ export interface Borrower {
   phone: string
   address: string
   joinedDate: string
+  /** Last time the borrower record was created or edited (display date). */
+  updatedAt: string
   notes: string
 }
 
@@ -52,6 +54,8 @@ export interface Loan {
   startDate: string
   status: LoanStatus
   purpose: string
+  /** Optional longer notes about the loan (shown on detail when set). */
+  description: string
   accruedInterest: number
   interestCollected: number
   lastPaymentDate?: string
@@ -76,6 +80,21 @@ export interface Payment {
 export interface RecordPaymentInput {
   loanId: string
   type: PaymentType
+  amount: number
+  date: string
+  mode: PaymentMode
+  reference?: string
+  notes?: string
+}
+
+/** One payment amount applied to a single loan as part of a borrower-wide interest payment. */
+export interface BorrowerInterestAllocation {
+  loanId: string
+  amount: number
+}
+
+export interface RecordBorrowerInterestPaymentInput {
+  borrowerId: string
   amount: number
   date: string
   mode: PaymentMode
@@ -122,6 +141,7 @@ export interface CreateLoanInput {
   ratePeriod: InterestRatePeriod
   startDate: string
   purpose: string
+  description?: string
   status: 'Active' | 'Pending'
   initialAccruedInterest?: number
   partnerShares?: LoanPartnerShare[]
@@ -131,6 +151,7 @@ export interface UpdateLoanInput {
   loanId: string
   borrowerId?: string
   purpose?: string
+  description?: string
   rate?: number
   ratePeriod?: InterestRatePeriod
   startDate?: string

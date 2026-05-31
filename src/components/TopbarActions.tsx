@@ -18,7 +18,8 @@ import { Icon } from './icons'
 
 export function TopbarActions() {
   const { page, detail, openDetail } = useNavigation()
-  const { loans, settings, getBorrower, getLoansByBorrower, dismissReminder } = useLoanBook()
+  const { loans, settings, getBorrower, getLoansByBorrower, dismissReminder, showToast } =
+    useLoanBook()
   const [notifyOpen, setNotifyOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -64,7 +65,7 @@ export function TopbarActions() {
     if (!loan || !borrower) return
     const message = buildLoanReminderMessage(borrower, loan, settings.businessName)
     if (!openWhatsApp(borrower.phone, message)) {
-      window.alert('Could not open WhatsApp. Check the phone number.')
+      showToast('Could not open WhatsApp. Check the phone number.', 'warning')
     }
   }
 
@@ -81,7 +82,7 @@ export function TopbarActions() {
         settings.businessName,
       )
       if (!openWhatsApp(contextBorrower.phone, message)) {
-        window.alert('Could not open WhatsApp. Check the phone number.')
+        showToast('Could not open WhatsApp. Check the phone number.', 'warning')
       }
     }
   }

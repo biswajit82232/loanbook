@@ -1,6 +1,9 @@
+import { useMemo } from 'react'
 import { BtnIcon } from '../components/BtnIcon'
+import { ListPagination } from '../components/ListPagination'
 import { SafeText } from '../components/SafeText'
-import { formatCurrency, getPaymentTypeLabel, getPortfolioStats } from '../data/helpers'
+import { formatCurrency, getPaymentTypeLabel, getPortfolioStats, parseAppDate } from '../data/helpers'
+import { usePagination } from '../hooks/usePagination'
 import { useNavigation } from '../context/NavigationContext'
 import { useLoanBook } from '../context/LoanBookContext'
 import { KpiCard } from '../components/KpiCard'
@@ -10,9 +13,16 @@ export function Payments() {
   const { payments, loans, getBorrower } = useLoanBook()
   const { collectedMtd } = getPortfolioStats(loans, payments)
 
-  const sortedPayments = [...payments].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  const sortedPayments = useMemo(
+    () =>
+      [...payments].sort(
+        (a, b) =>
+          (parseAppDate(b.date)?.getTime() ?? 0) - (parseAppDate(a.date)?.getTime() ?? 0),
+      ),
+    [payments],
   )
+
+  const pagination = usePagination(sortedPayments)
 
   return (
     <div className="page">
@@ -33,8 +43,18 @@ export function Payments() {
       {sortedPayments.length === 0 ? (
         <p className="empty-inline">No payments</p>
       ) : (
-        <ul className="compact-list">
-          {sortedPayments.map((p) => {
+        <>
+          <ListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            rangeLabel={pagination.rangeLabel}
+            canPrev={pagination.canPrev}
+            canNext={pagination.canNext}
+            onPrev={pagination.goPrev}
+            onNext={pagination.goNext}
+          />
+          <ul className="compact-list">
+            {pagination.pageItems.map((p) => {
             const borrower = getBorrower(p.borrowerId)
             const typeBadge =
               p.type === 'full_settlement' ? 'settlement' : 'interest'
@@ -74,8 +94,18 @@ export function Payments() {
                 </button>
               </li>
             )
-          })}
-        </ul>
+            })}
+          </ul>
+          <ListPagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            rangeLabel={pagination.rangeLabel}
+            canPrev={pagination.canPrev}
+            canNext={pagination.canNext}
+            onPrev={pagination.goPrev}
+            onNext={pagination.goNext}
+          />
+        </>
       )}
     </div>
   )

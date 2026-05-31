@@ -24,7 +24,9 @@ export function DetailRouter({ route }: { route: DetailRoute }) {
     case 'record-payment':
       return (
         <RecordPaymentPage
-          key={`${route.loanId ?? ''}-${route.paymentType ?? 'interest_only'}`}
+          key={`${route.scope ?? 'loan'}-${route.borrowerId ?? route.loanId ?? ''}-${route.paymentType ?? 'interest_only'}`}
+          scope={route.scope ?? 'loan'}
+          borrowerId={route.borrowerId}
           loanId={route.loanId}
           paymentType={route.paymentType}
         />

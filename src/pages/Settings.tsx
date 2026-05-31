@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { useLoanBook } from '../context/LoanBookContext'
 import { isSupabaseConfigured } from '../lib/env'
 import { OptionButtons } from '../components/OptionButtons'
+import { SettingsCollapsible } from '../components/SettingsCollapsible'
 import { applyAppearance } from '../utils/appearance'
 
 const RATE_PERIOD_OPTIONS = [
@@ -34,7 +35,7 @@ const ACCENT_OPTIONS: { value: AccentColor; label: string; swatch: string }[] = 
 ]
 
 export function Settings() {
-  const { settings, updateSettings } = useLoanBook()
+  const { settings, updateSettings, syncStatus, syncStatusLabel, retrySync } = useLoanBook()
   const { signOut, user } = useAuth()
   const cloudAccount = isSupabaseConfigured()
   const [form, setForm] = useState<AppSettings>(settings)
@@ -78,8 +79,7 @@ export function Settings() {
   return (
     <div className="page form-page settings-page">
       <form className="form form-page-form" onSubmit={handleSubmit}>
-        <section className="settings-section">
-          <h2 className="settings-section-title">Business</h2>
+        <SettingsCollapsible title="Business">
           <label className="field">
             <span className="field-label">Business name</span>
             <input
@@ -88,10 +88,9 @@ export function Settings() {
               onChange={(e) => patch({ businessName: e.target.value })}
             />
           </label>
-        </section>
+        </SettingsCollapsible>
 
-        <section className="settings-section">
-          <h2 className="settings-section-title">Loan defaults</h2>
+        <SettingsCollapsible title="Loan defaults">
           <label className="field">
             <span className="field-label">Default rate (%)</span>
             <input
@@ -113,10 +112,9 @@ export function Settings() {
             options={RATE_PERIOD_OPTIONS}
             onChange={(value) => patch({ defaultRatePeriod: value })}
           />
-        </section>
+        </SettingsCollapsible>
 
-        <section className="settings-section">
-          <h2 className="settings-section-title">Appearance</h2>
+        <SettingsCollapsible title="Appearance">
           <OptionButtons
             label="Theme"
             value={form.theme}
@@ -155,10 +153,9 @@ export function Settings() {
             />
             <span>Compact lists</span>
           </label>
-        </section>
+        </SettingsCollapsible>
 
-        <section className="settings-section">
-          <h2 className="settings-section-title">Reminders</h2>
+        <SettingsCollapsible title="Reminders">
           <label className="field">
             <span className="field-label">Reminder period (days)</span>
             <input
@@ -174,9 +171,9 @@ export function Settings() {
               }}
             />
           </label>
-        </section>
+        </SettingsCollapsible>
 
-        <div className="form-page-actions">
+        <div className="form-page-actions settings-save-actions">
           <button type="submit" className="btn btn-primary">
             Save settings
           </button>
@@ -184,19 +181,25 @@ export function Settings() {
       </form>
 
       {cloudAccount && user && (
-        <section className="settings-section settings-section--account">
-          <h2 className="settings-section-title">Account</h2>
+        <SettingsCollapsible title="Account">
           <p className="settings-account-email">{user.email}</p>
+          <p className={`settings-sync-status settings-sync-status--${syncStatus}`}>
+            {syncStatusLabel}
+          </p>
+          {(syncStatus === 'error' || syncStatus === 'offline') && (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={retrySync}>
+              Retry sync
+            </button>
+          )}
           <button type="button" className="btn btn-secondary" onClick={() => signOut()}>
             Sign out
           </button>
-        </section>
+        </SettingsCollapsible>
       )}
 
-      <section className="settings-section settings-section--about">
-        <h2 className="settings-section-title">About</h2>
+      <SettingsCollapsible title="About">
         <p className="settings-version">Version {APP_VERSION}</p>
-      </section>
+      </SettingsCollapsible>
     </div>
   )
 }

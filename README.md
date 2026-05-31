@@ -2,19 +2,20 @@
 
 Loan management PWA for tracking borrowers, loans, partner shares, payments, and monthly reports. Built with Vite, React 19, and TypeScript.
 
-- **Local dev:** data in browser `localStorage` (no Supabase env required).
+- **Local dev:** data in browser storage (no Supabase env required).
 - **Production:** [Vercel](https://vercel.com) + [Supabase](https://supabase.com) with email/password for a single user. See **[DEPLOYMENT.md](./DEPLOYMENT.md)**.
 
 ## Features
 
-- Dashboard with portfolio KPIs and recent payments
-- Loans, borrowers, partners, and payments with compact lists
-- Interest accrual, partial interest payments, and full settlement
+- Dashboard with portfolio KPIs, reminders, and recent payments
+- Loans, borrowers, partners, and payments with paginated lists (25 per page)
+- Interest accrual, borrower-wide interest payments, partial payments, and full settlement
 - Partner shares per loan with individual rates
-- Monthly reports derived from payment history
+- Monthly reports with KPIs and charts
 - WhatsApp payment reminders and dashboard notification bell
 - Settings: theme, accent color, currency, compact lists, reminder period
-- Installable PWA with offline caching
+- Installable PWA with offline shell; cloud users get IndexedDB device cache (large books supported)
+- Real load progress on sign-in and first sync
 
 ## Scripts
 
@@ -30,25 +31,31 @@ npm run lint     # ESLint
 
 ```
 src/
-  components/     UI shell, forms, icons, dialogs
-  constants/      Shared navigation config
+  components/     UI shell, forms, icons, reports, pagination
+  constants/      Navigation, brand assets, pagination defaults
   context/        Auth, loan book data, navigation
-  data/           Types, helpers, seed, settings, Supabase repo
-  lib/            Supabase client and env helpers
+  data/           Types, helpers, Supabase repo, IndexedDB cache, reports
+  hooks/          usePagination
+  lib/            Supabase client, env, PWA update, app version
   pages/          List pages, detail views, forms
-  utils/          Appearance, dates, WhatsApp
-  App.tsx         Routes via navigation context
-  main.tsx        Entry + theme bootstrap
-public/           favicon, PWA icons
+  utils/          Appearance, dates, WhatsApp, view keys
+public/           favicon.png, PWA icons (required for deploy)
+supabase/migrations/   Postgres schema + pending migration helper
 ```
 
 ## Data storage
 
 **Cloud (Supabase):** borrowers, loans, payments, partners, and settings sync per authenticated user.
 
-**Local fallback:** `loanbook-data-v1` and `loanbook-settings-v1` in `localStorage` (includes dismissed reminders in settings). Clear site data to reset to seed demo content.
+**On-device (cloud users):** full book cached in **IndexedDB** (migrates automatically from older `localStorage` keys). Sync metadata stays in `localStorage`.
+
+**Local-only mode:** no Supabase env vars — book stored in IndexedDB under a local key; settings in `loanbook-settings-v1`.
 
 ## Install as PWA
 
-- **Mobile:** browser menu → Add to Home Screen
-- **Desktop:** install icon in the address bar (Chrome / Edge)
+- **Mobile:** browser menu → Add to Home Screen (remove an old shortcut after updates to refresh the icon).
+- **Desktop:** install icon in the address bar (Chrome / Edge).
+
+## Version
+
+App version comes from `package.json` and appears in the sidebar and Settings.

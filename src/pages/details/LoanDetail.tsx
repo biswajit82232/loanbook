@@ -22,6 +22,7 @@ import { DetailField, DetailGrid, DetailSection } from '../../components/DetailS
 import { KpiCard } from '../../components/KpiCard'
 import { LinkCard } from '../../components/LinkCard'
 import { SafeAmount } from '../../components/SafeAmount'
+import { SafeText } from '../../components/SafeText'
 
 export function LoanDetail({ id }: { id: string }) {
   const { openPaymentForm, openLoanForm, goBack } = useNavigation()
@@ -94,6 +95,14 @@ export function LoanDetail({ id }: { id: string }) {
           <DetailField label="Last payment" value={loan.lastPaymentDate ?? '—'} />
         </DetailGrid>
       </DetailSection>
+
+      {loan.description.trim() !== '' && (
+        <DetailSection title="Description">
+          <SafeText as="p" className="detail-description">
+            {loan.description}
+          </SafeText>
+        </DetailSection>
+      )}
 
       {(loan.partnerShares ?? []).length > 0 && (
         <DetailSection title="Partners">

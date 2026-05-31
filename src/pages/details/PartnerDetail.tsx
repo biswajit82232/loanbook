@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   calculatePartnerInterestOnLoan,
   formatCurrency,
@@ -10,6 +11,8 @@ import {
 } from '../../data/helpers'
 import { formatDisplayPhone } from '../../utils/phone'
 import { BtnIcon } from '../../components/BtnIcon'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { Icon } from '../../components/icons'
 import { useNavigation } from '../../context/NavigationContext'
 import { useLoanBook } from '../../context/LoanBookContext'
 import { KpiCard } from '../../components/KpiCard'
@@ -18,8 +21,10 @@ import { DetailField, DetailGrid, DetailSection } from '../../components/DetailS
 import { LinkCard } from '../../components/LinkCard'
 
 export function PartnerDetail({ id }: { id: string }) {
-  const { openPartnerForm } = useNavigation()
-  const { getPartner, loans, getBorrower } = useLoanBook()
+  const { openPartnerForm, goBack } = useNavigation()
+  const { getPartner, loans, getBorrower, deletePartner } = useLoanBook()
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const partner = getPartner(id)
 
   if (!partner) {
@@ -29,6 +34,21 @@ export function PartnerDetail({ id }: { id: string }) {
   const partnerLoans = getLoansForPartner(partner.id, loans)
   const deployed = getPartnerPrincipalDeployed(partner.id, loans)
   const interestDue = getPartnerInterestDue(partner.id, loans)
+
+  function openDeleteConfirm() {
+    setDeleteError('')
+    setDeleteOpen(true)
+  }
+
+  function handleConfirmDelete() {
+    const result = deletePartner(id)
+    if (result.ok) {
+      setDeleteOpen(false)
+      goBack()
+    } else {
+      setDeleteError(result.error)
+    }
+  }
 
   return (
     <div className="page detail-page">
@@ -111,7 +131,34 @@ export function PartnerDetail({ id }: { id: string }) {
         >
           <BtnIcon icon="pencil">Edit partner</BtnIcon>
         </button>
+        <button type="button" className="btn btn-danger" onClick={openDeleteConfirm}>
+          <span className="btn-inner">
+            <Icon name="trash" size={18} className="btn-inner-icon" />
+            <span>Delete partner</span>
+          </span>
+        </button>
       </div>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        title="Delete partner?"
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        error={deleteError}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={handleConfirmDelete}
+      >
+        <div className="modal-summary">
+          <strong>{partner.name}</strong>
+          <span>{partner.id}</span>
+          {partnerLoans.length > 0 && (
+            <span>
+              Will be removed from {partnerLoans.length} loan
+              {partnerLoans.length === 1 ? '' : 's'}
+            </span>
+          )}
+        </div>
+      </ConfirmDialog>
     </div>
   )
 }

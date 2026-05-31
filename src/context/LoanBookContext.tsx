@@ -19,6 +19,7 @@ import type {
   Partner,
   Payment,
   PaymentType,
+  RecordBorrowerInterestPaymentInput,
   RecordPaymentInput,
   UpdateBorrowerInput,
   UpdateLoanInput,
@@ -29,7 +30,10 @@ import {
   applyPaymentToLoan,
   buildInitialInterestLog,
   buildPaymentAmounts,
+  compareLoanByStartDateNewest,
+  formatCurrency,
   healLoanBookData,
+  planBorrowerInterestPayment,
   recomputeLoanFromPayments,
   formatDisplayDate,
   getMonthlySummaries,
@@ -38,6 +42,8 @@ import {
   normalizePartner,
   nextBorrowerId,
   nextLoanId,
+  nextPaymentId,
+  parseAppDate,
   type MonthSummary,
   validateCreateBorrower,
   validateCreateLoan,
@@ -47,6 +53,20 @@ import {
   validateUpdatePartner,
   nextPartnerId,
 } from '../data/helpers'
+import {
+  formatSyncStatusLabel,
+  LOCAL_BOOK_STORAGE_ID,
+  loadLocalCache,
+  loadSyncMeta,
+  onLocalCacheWarning,
+  peekLocalCache,
+  saveLocalCache,
+  saveLocalCacheNow,
+  saveSyncMeta,
+  type SyncStatus,
+} from '../data/local-cache'
+import type { LoadProgressUpdate } from '../data/load-progress'
+import { clampLoadPercent } from '../data/load-progress'
 import { fetchLoanBook, syncLoanBook } from '../data/supabase-repo'
 import {
   defaultSettings,
@@ -59,7 +79,23 @@ import { applyAppearance } from '../utils/appearance'
 import { configureFormatPrefs } from '../data/formatPrefs'
 import { useAuth } from './AuthContext'
 
-const STORAGE_KEY = 'loanbook-data-v1'
+const SYNC_DEBOUNCE_MS = 2000
+
+export type ToastVariant = 'success' | 'error' | 'warning'
+export type AppToast = { message: string; variant: ToastVariant }
+
+function loansNeedHealPush(raw: LoanBookData, healed: LoanBookData): boolean {
+  return healed.loans.some((loan) => {
+    const source = raw.loans.find((l) => l.id === loan.id)
+    if (!source) return true
+    return (
+      (source.accruedInterest ?? 0) !== (loan.accruedInterest ?? 0) ||
+      source.principalOutstanding !== loan.principalOutstanding ||
+      source.lastPaymentDate !== loan.lastPaymentDate ||
+      source.status !== loan.status
+    )
+  })
+}
 
 interface LoanBookContextValue {
   borrowers: Borrower[]
@@ -77,12 +113,20 @@ interface LoanBookContextValue {
   dismissReminder: (dismissKey: string) => void
   dataLoading: boolean
   dataReady: boolean
+  loadProgress: LoadProgressUpdate
+  syncStatus: SyncStatus
+  syncStatusLabel: string
+  syncPending: boolean
+  retrySync: () => void
   getLoansByBorrower: (borrowerId: string) => Loan[]
   getPaymentsByLoan: (loanId: string) => Payment[]
   getPaymentsByBorrower: (borrowerId: string) => Payment[]
   recordPayment: (
     input: RecordPaymentInput,
   ) => { ok: true; paymentId: string } | { ok: false; error: string }
+  recordBorrowerInterestPayment: (
+    input: RecordBorrowerInterestPaymentInput,
+  ) => { ok: true; paymentIds: string[] } | { ok: false; error: string }
   deletePayment: (paymentId: string) => { ok: true } | { ok: false; error: string }
   deleteLoan: (loanId: string) => { ok: true } | { ok: false; error: string }
   deleteBorrower: (borrowerId: string) => { ok: true } | { ok: false; error: string }
@@ -100,30 +144,13 @@ interface LoanBookContextValue {
     input: CreatePartnerInput,
   ) => { ok: true; partnerId: string } | { ok: false; error: string }
   updatePartner: (input: UpdatePartnerInput) => { ok: true } | { ok: false; error: string }
-  toast: string | null
+  deletePartner: (partnerId: string) => { ok: true } | { ok: false; error: string }
+  toast: AppToast | null
+  showToast: (message: string, variant?: ToastVariant) => void
   clearToast: () => void
 }
 
 const LoanBookContext = createContext<LoanBookContextValue | null>(null)
-
-function loadStoredData(): LoanBookData | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const data = JSON.parse(raw) as LoanBookData
-    return { ...data, partners: data.partners ?? [] }
-  } catch {
-    return null
-  }
-}
-
-function saveData(data: LoanBookData) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  } catch {
-    /* ignore */
-  }
-}
 
 export function LoanBookProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
@@ -134,13 +161,29 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
   const [loans, setLoans] = useState<Loan[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [partners, setPartners] = useState<Partner[]>([])
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<AppToast | null>(null)
   const [settings, setSettings] = useState<AppSettings>(defaultSettings)
-  const [dataLoading, setDataLoading] = useState(useCloud)
-  const [dataReady, setDataReady] = useState(!useCloud)
+  const [dataLoading, setDataLoading] = useState(true)
+  const [dataReady, setDataReady] = useState(false)
+  const [loadProgress, setLoadProgress] = useState<LoadProgressUpdate>({
+    percent: 0,
+    label: 'Starting…',
+  })
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle')
+  const [syncMeta, setSyncMeta] = useState(() => ({
+    pendingChanges: false,
+    lastSyncedAt: null as string | null,
+    lastPullAt: null as string | null,
+    lastError: null as string | null,
+  }))
 
   const settingsRef = useRef(settings)
   settingsRef.current = settings
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const syncInFlightRef = useRef(false)
+  const syncQueuedRef = useRef(false)
+  const userIdRef = useRef(userId)
+  userIdRef.current = userId
 
   useEffect(() => {
     applyAppearance(settings)
@@ -150,42 +193,245 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
     })
   }, [settings])
 
+  const showToast = useCallback((message: string, variant: ToastVariant = 'success') => {
+    setToast({ message, variant })
+  }, [])
+
+  useEffect(() => onLocalCacheWarning((message) => showToast(message, 'warning')), [showToast])
+
+  const reportLoadProgress = useCallback((update: LoadProgressUpdate) => {
+    setLoadProgress({
+      percent: clampLoadPercent(update.percent),
+      label: update.label,
+    })
+  }, [])
+
+  const applyHealedBook = useCallback((book: LoanBookData, loadedSettings: AppSettings) => {
+    const healed = healLoanBookData(book)
+    setBorrowers(healed.borrowers)
+    setLoans(healed.loans)
+    setPayments(healed.payments)
+    setPartners(healed.partners)
+    setSettings(loadedSettings)
+    settingsRef.current = loadedSettings
+    saveSettings(loadedSettings)
+    return healed
+  }, [])
+
+  const flushSync = useCallback(async () => {
+    const uid = userIdRef.current
+    if (!uid || !isSupabaseConfigured()) return
+
+    if (syncInFlightRef.current) {
+      syncQueuedRef.current = true
+      return
+    }
+
+    const cache = peekLocalCache(uid)
+    if (!cache) return
+
+    if (!navigator.onLine) {
+      const meta = saveSyncMeta(uid, { pendingChanges: true })
+      setSyncMeta(meta)
+      setSyncStatus('offline')
+      return
+    }
+
+    syncInFlightRef.current = true
+    setSyncStatus('syncing')
+
+    const healed = healLoanBookData(cache.data)
+    const settings = normalizeSettings(cache.settings)
+    const { error } = await syncLoanBook(uid, healed, settings)
+
+    syncInFlightRef.current = false
+
+    if (error) {
+      const meta = saveSyncMeta(uid, { pendingChanges: true, lastError: error })
+      setSyncMeta(meta)
+      setSyncStatus('error')
+      setToast({ message: `Sync failed: ${error}`, variant: 'error' })
+    } else {
+      const meta = saveSyncMeta(uid, {
+        pendingChanges: false,
+        lastSyncedAt: new Date().toISOString(),
+        lastError: null,
+      })
+      setSyncMeta(meta)
+      setSyncStatus('synced')
+      void saveLocalCacheNow(uid, healed, settings)
+    }
+
+    if (syncQueuedRef.current) {
+      syncQueuedRef.current = false
+      void flushSync()
+    }
+  }, [])
+
+  const scheduleSync = useCallback(() => {
+    const uid = userIdRef.current
+    if (!uid || !isSupabaseConfigured()) return
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
+    syncTimerRef.current = setTimeout(() => {
+      syncTimerRef.current = null
+      void flushSync()
+    }, SYNC_DEBOUNCE_MS)
+  }, [flushSync])
+
+  const retrySync = useCallback(() => {
+    if (syncTimerRef.current) {
+      clearTimeout(syncTimerRef.current)
+      syncTimerRef.current = null
+    }
+    void flushSync()
+  }, [flushSync])
+
+  useEffect(() => {
+    return () => {
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!useCloud || !userId) return
+
+    const onVisibility = () => {
+      if (document.visibilityState !== 'hidden') return
+      const meta = loadSyncMeta(userId)
+      if (meta.pendingChanges) void flushSync()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [useCloud, userId, flushSync])
+
   useEffect(() => {
     if (useCloud && userId) {
       let cancelled = false
-      setDataLoading(true)
-      setDataReady(false)
 
-      fetchLoanBook(userId)
-        .then(({ data, settings: loaded }) => {
-          if (cancelled) return
-          const healed = healLoanBookData(data)
-          setBorrowers(healed.borrowers)
-          setLoans(healed.loans)
-          setPayments(healed.payments)
-          setPartners(healed.partners)
-          setSettings(loaded)
-          const loansChanged = healed.loans.some((loan) => {
-            const raw = data.loans.find((l) => l.id === loan.id)
-            if (!raw) return true
-            return (
-              (raw.accruedInterest ?? 0) !== (loan.accruedInterest ?? 0) ||
-              raw.principalOutstanding !== loan.principalOutstanding ||
-              raw.lastPaymentDate !== loan.lastPaymentDate ||
-              raw.status !== loan.status
-            )
-          })
-          if (loansChanged) {
-            void syncLoanBook(userId, healed, loaded)
-          }
+      void (async () => {
+        reportLoadProgress({ percent: 3, label: 'Checking this device…' })
+        const cache = await loadLocalCache(userId)
+        if (cancelled) return
+
+        let meta = loadSyncMeta(userId)
+        setSyncMeta(meta)
+
+        const fetchBase = cache ? 28 : 8
+        const fetchSpan = cache ? 62 : 82
+
+        if (cache) {
+          reportLoadProgress({ percent: 22, label: 'Loaded from this device' })
+          applyHealedBook(cache.data, cache.settings)
           setDataReady(true)
-        })
-        .catch((err: Error) => {
-          if (!cancelled) setToast(err.message || 'Failed to load data')
-        })
-        .finally(() => {
-          if (!cancelled) setDataLoading(false)
-        })
+          setDataLoading(false)
+          setSyncStatus(meta.pendingChanges ? 'idle' : meta.lastSyncedAt ? 'synced' : 'idle')
+        } else {
+          reportLoadProgress({ percent: 8, label: 'Connecting to cloud…' })
+        }
+
+        try {
+          const { data, settings: serverSettings } = await fetchLoanBook(userId, (step) => {
+            if (cancelled) return
+            reportLoadProgress({
+              percent: fetchBase + Math.round((step.percent / 100) * fetchSpan),
+              label: step.label,
+            })
+          })
+          if (cancelled) return
+
+          reportLoadProgress({
+            percent: cache ? 93 : 96,
+            label: 'Applying your data…',
+          })
+
+          const healedServer = healLoanBookData(data)
+          meta = loadSyncMeta(userId)
+
+          if (meta.pendingChanges) {
+            const local = peekLocalCache(userId) ?? (await loadLocalCache(userId))
+            if (!local) {
+              applyHealedBook(healedServer, serverSettings)
+              await saveLocalCacheNow(userId, healedServer, serverSettings)
+              meta = saveSyncMeta(userId, {
+                pendingChanges: false,
+                lastPullAt: new Date().toISOString(),
+                lastSyncedAt: new Date().toISOString(),
+                lastError: null,
+              })
+              setSyncMeta(meta)
+              setSyncStatus('synced')
+            } else {
+              const localHealed = healLoanBookData(local.data)
+              const { error } = await syncLoanBook(
+                userId,
+                localHealed,
+                normalizeSettings(local.settings),
+              )
+              if (cancelled) return
+              if (error) {
+                meta = saveSyncMeta(userId, { lastError: error, pendingChanges: true })
+                setSyncMeta(meta)
+                setSyncStatus('error')
+                setToast({ message: `Sync failed: ${error}`, variant: 'error' })
+              } else {
+                applyHealedBook(localHealed, local.settings)
+                meta = saveSyncMeta(userId, {
+                  pendingChanges: false,
+                  lastPullAt: new Date().toISOString(),
+                  lastSyncedAt: new Date().toISOString(),
+                  lastError: null,
+                })
+                setSyncMeta(meta)
+                setSyncStatus('synced')
+                await saveLocalCacheNow(userId, localHealed, local.settings)
+              }
+            }
+          } else {
+            applyHealedBook(healedServer, serverSettings)
+            await saveLocalCacheNow(userId, healedServer, serverSettings)
+
+            if (loansNeedHealPush(data, healedServer)) {
+              const { error } = await syncLoanBook(userId, healedServer, serverSettings)
+              if (cancelled) return
+              if (error) {
+                meta = saveSyncMeta(userId, { lastError: error, pendingChanges: true })
+                setSyncMeta(meta)
+                setSyncStatus('error')
+                setToast({ message: `Heal sync failed: ${error}`, variant: 'error' })
+              }
+            }
+
+            if (!cancelled) {
+              meta = saveSyncMeta(userId, {
+                pendingChanges: false,
+                lastPullAt: new Date().toISOString(),
+                lastSyncedAt: new Date().toISOString(),
+                lastError: null,
+              })
+              setSyncMeta(meta)
+              setSyncStatus('synced')
+            }
+          }
+
+          if (!cancelled) {
+            reportLoadProgress({ percent: 100, label: 'Ready' })
+          }
+        } catch (err) {
+          if (cancelled) return
+          if (cache) {
+            meta = saveSyncMeta(userId, { lastError: (err as Error).message })
+            setSyncMeta(meta)
+            setSyncStatus('offline')
+          } else {
+            showToast((err as Error).message || 'Failed to load data', 'error')
+          }
+        } finally {
+          if (!cancelled) {
+            setDataReady(true)
+            setDataLoading(false)
+          }
+        }
+      })()
 
       return () => {
         cancelled = true
@@ -193,22 +439,52 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
     }
 
     if (!useCloud) {
-      const stored = loadStoredData()
-      const book = healLoanBookData({
-        borrowers: (stored?.borrowers ?? seedBorrowers).map(normalizeBorrower),
-        loans: (stored?.loans ?? seedLoans).map(normalizeLoan),
-        payments: stored?.payments ?? seedPayments,
-        partners: (stored?.partners ?? seedPartners).map(normalizePartner),
-      })
-      setBorrowers(book.borrowers)
-      setLoans(book.loans)
-      setPayments(book.payments)
-      setPartners(book.partners)
-      setSettings(loadSettings())
-      setDataReady(true)
-      setDataLoading(false)
+      let cancelled = false
+      void (async () => {
+        reportLoadProgress({ percent: 12, label: 'Reading saved data…' })
+        await new Promise((r) => setTimeout(r, 0))
+        if (cancelled) return
+
+        const cached = await loadLocalCache(LOCAL_BOOK_STORAGE_ID)
+        reportLoadProgress({ percent: 48, label: 'Loading loans & payments…' })
+        await new Promise((r) => setTimeout(r, 0))
+        if (cancelled) return
+
+        const stored = cached?.data
+        const book = healLoanBookData({
+          borrowers: (stored?.borrowers ?? seedBorrowers).map(normalizeBorrower),
+          loans: (stored?.loans ?? seedLoans).map(normalizeLoan),
+          payments: stored?.payments ?? seedPayments,
+          partners: (stored?.partners ?? seedPartners).map(normalizePartner),
+        })
+        const loadedSettings = cached?.settings ?? loadSettings()
+
+        reportLoadProgress({ percent: 82, label: 'Preparing your book…' })
+        setBorrowers(book.borrowers)
+        setLoans(book.loans)
+        setPayments(book.payments)
+        setPartners(book.partners)
+        setSettings(loadedSettings)
+        settingsRef.current = loadedSettings
+        saveSettings(loadedSettings)
+        saveLocalCache(LOCAL_BOOK_STORAGE_ID, book, loadedSettings)
+        reportLoadProgress({ percent: 100, label: 'Ready' })
+        if (!cancelled) {
+          setDataReady(true)
+          setDataLoading(false)
+        }
+      })()
+
+      return () => {
+        cancelled = true
+      }
     }
-  }, [useCloud, userId])
+  }, [useCloud, userId, applyHealedBook, reportLoadProgress, showToast])
+
+  const syncStatusLabel = useMemo(
+    () => formatSyncStatusLabel(syncStatus, syncMeta),
+    [syncStatus, syncMeta],
+  )
 
   const monthlySummaries = useMemo(
     () => getMonthlySummaries(payments),
@@ -224,14 +500,16 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       setPartners(payload.partners.map(normalizePartner))
 
       if (useCloud && userId) {
-        void syncLoanBook(userId, payload, settingsRef.current).then(({ error }) => {
-          if (error) setToast(`Save failed: ${error}`)
-        })
+        saveLocalCache(userId, payload, settingsRef.current)
+        const meta = saveSyncMeta(userId, { pendingChanges: true, lastError: null })
+        setSyncMeta(meta)
+        setSyncStatus('idle')
+        scheduleSync()
       } else {
-        saveData(payload)
+        saveLocalCache(LOCAL_BOOK_STORAGE_ID, payload, settingsRef.current)
       }
     },
-    [useCloud, userId],
+    [useCloud, userId, scheduleSync],
   )
 
   const getBorrower = useCallback(
@@ -264,20 +542,17 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       })
 
       if (useCloud && userId) {
-        void syncLoanBook(
-          userId,
-          { borrowers, loans, payments, partners },
-          normalized,
-        ).then(({ error }) => {
-          if (error) setToast(`Save failed: ${error}`)
-          else setToast('Settings saved')
-        })
+        saveLocalCache(userId, { borrowers, loans, payments, partners }, normalized)
+        const meta = saveSyncMeta(userId, { pendingChanges: true, lastError: null })
+        setSyncMeta(meta)
+        scheduleSync()
+        showToast('Settings saved')
       } else {
         saveSettings(normalized)
-        setToast('Settings saved')
+        showToast('Settings saved')
       }
     },
-    [useCloud, userId, borrowers, loans, payments, partners],
+    [useCloud, userId, borrowers, loans, payments, partners, scheduleSync],
   )
 
   const dismissReminder = useCallback(
@@ -293,25 +568,59 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
     [updateSettings],
   )
   const getLoansByBorrower = useCallback(
-    (borrowerId: string) => loans.filter((l) => l.borrowerId === borrowerId),
+    (borrowerId: string) =>
+      loans
+        .filter((l) => l.borrowerId === borrowerId)
+        .sort(compareLoanByStartDateNewest),
     [loans],
   )
   const getPaymentsByLoan = useCallback(
     (loanId: string) =>
       [...payments]
         .filter((p) => p.loanId === loanId)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        .sort(
+          (a, b) =>
+            (parseAppDate(b.date)?.getTime() ?? 0) - (parseAppDate(a.date)?.getTime() ?? 0),
+        ),
     [payments],
   )
   const getPaymentsByBorrower = useCallback(
     (borrowerId: string) =>
       [...payments]
         .filter((p) => p.borrowerId === borrowerId)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        .sort(
+          (a, b) =>
+            (parseAppDate(b.date)?.getTime() ?? 0) - (parseAppDate(a.date)?.getTime() ?? 0),
+        ),
     [payments],
   )
 
   const clearToast = useCallback(() => setToast(null), [])
+
+  useEffect(() => {
+    if (!useCloud || !userId) return
+
+    const onOnline = () => {
+      const meta = loadSyncMeta(userId)
+      if (meta.pendingChanges) {
+        setSyncStatus('idle')
+        void flushSync()
+      } else if (syncStatus === 'offline') {
+        setSyncStatus(meta.lastSyncedAt ? 'synced' : 'idle')
+      }
+    }
+
+    const onOffline = () => {
+      setSyncStatus('offline')
+    }
+
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+    }
+  }, [useCloud, userId, flushSync, syncStatus])
 
   const createLoan = useCallback(
     (input: CreateLoanInput): { ok: true; loanId: string } | { ok: false; error: string } => {
@@ -338,6 +647,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
         startDate,
         status: input.status,
         purpose: input.purpose.trim(),
+        description: input.description?.trim() ?? '',
         accruedInterest: isActive ? accrued : 0,
         interestCollected: 0,
         interestLog: [],
@@ -345,9 +655,9 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       })
 
       persist({ borrowers, loans: [loan, ...loans], payments, partners })
-      setToast(
+      showToast(
         isActive
-          ? `Loan ${loanId} created — ${formatToastAmount(input.principal)} lent`
+          ? `Loan ${loanId} created — ${formatCurrency(input.principal)} lent`
           : `Loan ${loanId} saved as pending disbursement`,
       )
       return { ok: true, loanId }
@@ -368,6 +678,10 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
         const updated: Loan = {
           ...loan,
           purpose: input.purpose?.trim() ?? loan.purpose,
+          description:
+            input.description !== undefined
+              ? input.description.trim()
+              : loan.description,
         }
         persist({
           borrowers,
@@ -375,7 +689,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
           payments,
           partners,
         })
-        setToast(`Loan ${loan.id} updated`)
+        showToast(`Loan ${loan.id} updated`)
         return { ok: true }
       }
 
@@ -383,6 +697,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
 
       if (input.borrowerId !== undefined) updated.borrowerId = input.borrowerId
       if (input.purpose !== undefined) updated.purpose = input.purpose.trim()
+      if (input.description !== undefined) updated.description = input.description.trim()
       if (input.rate !== undefined) updated.rate = input.rate
       if (input.ratePeriod !== undefined) updated.ratePeriod = input.ratePeriod
       if (input.startDate !== undefined) updated.startDate = input.startDate
@@ -435,7 +750,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
         payments,
         partners,
       })
-      setToast(`Loan ${loan.id} updated`)
+      showToast(`Loan ${loan.id} updated`)
       return { ok: true }
     },
     [borrowers, loans, payments, partners, persist],
@@ -448,17 +763,19 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       const err = validateCreateBorrower(input)
       if (err) return { ok: false, error: err }
 
+      const now = formatDisplayDate()
       const borrower: Borrower = {
         id: nextBorrowerId(borrowers),
         name: input.name.trim(),
         phone: input.phone?.trim() ?? '',
         address: input.address?.trim() || '—',
-        joinedDate: formatDisplayDate(),
+        joinedDate: now,
+        updatedAt: now,
         notes: input.notes?.trim() || '',
       }
 
       persist({ borrowers: [borrower, ...borrowers], loans, payments, partners })
-      setToast(`Borrower ${borrower.name} added`)
+      showToast(`Borrower ${borrower.name} added`)
       return { ok: true, borrowerId: borrower.id }
     },
     [borrowers, loans, payments, partners, persist],
@@ -481,6 +798,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
             ? input.address.trim() || '—'
             : borrower.address,
         notes: input.notes?.trim() ?? borrower.notes,
+        updatedAt: formatDisplayDate(),
       }
 
       persist({
@@ -489,7 +807,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
         payments,
         partners,
       })
-      setToast(`${updated.name} updated`)
+      showToast(`${updated.name} updated`)
       return { ok: true }
     },
     [borrowers, loans, payments, partners, persist],
@@ -512,7 +830,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       }
 
       persist({ borrowers, loans, payments, partners: [partner, ...partners] })
-      setToast(`Partner ${partner.name} added`)
+      showToast(`Partner ${partner.name} added`)
       return { ok: true, partnerId: partner.id }
     },
     [borrowers, loans, payments, partners, persist],
@@ -541,7 +859,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
         payments,
         partners: partners.map((p) => (p.id === partner.id ? updated : p)),
       })
-      setToast(`${updated.name} updated`)
+      showToast(`${updated.name} updated`)
       return { ok: true }
     },
     [borrowers, loans, payments, partners, persist],
@@ -555,7 +873,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       const amounts = buildPaymentAmounts(loan, input.type, input.amount)
       if ('error' in amounts) return { ok: false, error: amounts.error }
 
-      const paymentId = `PY-${Date.now()}`
+      const paymentId = nextPaymentId(payments)
       const payment: Payment = {
         id: paymentId,
         loanId: loan.id,
@@ -577,12 +895,76 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
         payments: [payment, ...payments],
         partners,
       })
-      setToast(
+      showToast(
         input.type === 'full_settlement'
-          ? `Loan ${loan.id} closed — ${formatToastAmount(payment.amount)} received`
-          : `Interest payment recorded — ${formatToastAmount(payment.amount)}`,
+          ? `Loan ${loan.id} closed — ${formatCurrency(payment.amount)} received`
+          : `Interest payment recorded — ${formatCurrency(payment.amount)}`,
       )
       return { ok: true, paymentId }
+    },
+    [borrowers, loans, payments, partners, persist],
+  )
+
+  const recordBorrowerInterestPayment = useCallback(
+    (
+      input: RecordBorrowerInterestPaymentInput,
+    ): { ok: true; paymentIds: string[] } | { ok: false; error: string } => {
+      const borrower = borrowers.find((b) => b.id === input.borrowerId)
+      if (!borrower) return { ok: false, error: 'Borrower not found.' }
+
+      const plan = planBorrowerInterestPayment(loans, input.borrowerId, input.amount)
+      if (!plan.ok) return { ok: false, error: plan.error }
+
+      const payDate = input.date || formatDisplayDate()
+      const batchId = `BATCH-${Date.now()}`
+      const sharedRef = input.reference?.trim() || '—'
+      const noteBase =
+        input.notes?.trim() ||
+        `Borrower interest (${plan.allocations.length} loans) · ${batchId}`
+
+      let nextLoans = loans
+      const newPayments: Payment[] = []
+      const knownIds = [...payments]
+
+      for (let i = 0; i < plan.allocations.length; i++) {
+        const { loanId, amount } = plan.allocations[i]
+        const loan = nextLoans.find((l) => l.id === loanId)
+        if (!loan) return { ok: false, error: `Loan ${loanId} not found.` }
+
+        const amounts = buildPaymentAmounts(loan, 'interest_only', amount)
+        if ('error' in amounts) return { ok: false, error: amounts.error }
+
+        const payment: Payment = {
+          id: nextPaymentId(knownIds),
+          loanId: loan.id,
+          borrowerId: loan.borrowerId,
+          date: payDate,
+          amount: amounts.total,
+          type: 'interest_only',
+          interestAmount: amounts.interestAmount,
+          principalAmount: 0,
+          mode: input.mode,
+          reference: sharedRef,
+          notes: noteBase,
+        }
+
+        newPayments.push(payment)
+        knownIds.push(payment)
+        nextLoans = nextLoans.map((l) =>
+          l.id === loan.id ? normalizeLoan(applyPaymentToLoan(loan, payment)) : l,
+        )
+      }
+
+      persist({
+        borrowers,
+        loans: nextLoans,
+        payments: [...newPayments, ...payments],
+        partners,
+      })
+      showToast(
+        `Interest across ${newPayments.length} loan${newPayments.length === 1 ? '' : 's'} — ${formatCurrency(input.amount)}`,
+      )
+      return { ok: true, paymentIds: newPayments.map((p) => p.id) }
     },
     [borrowers, loans, payments, partners, persist],
   )
@@ -605,7 +987,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
         payments: payments.filter((p) => p.id !== paymentId),
         partners,
       })
-      setToast(`Payment ${paymentId} deleted`)
+      showToast(`Payment ${paymentId} deleted`)
       return { ok: true }
     },
     [borrowers, loans, payments, partners, persist],
@@ -623,7 +1005,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
         payments: payments.filter((p) => p.loanId !== loanId),
         partners,
       })
-      setToast(
+      showToast(
         removedPayments > 0
           ? `Loan ${loanId} and ${removedPayments} payment${removedPayments === 1 ? '' : 's'} deleted`
           : `Loan ${loanId} deleted`,
@@ -657,10 +1039,43 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
           `${removedPayments} payment${removedPayments === 1 ? '' : 's'}`,
         )
       }
-      setToast(parts.length > 1 ? `${parts[0]} — ${parts.slice(1).join(', ')}` : parts[0])
+      showToast(parts.length > 1 ? `${parts[0]} — ${parts.slice(1).join(', ')}` : parts[0])
       return { ok: true }
     },
-    [borrowers, loans, payments, partners, persist],
+    [borrowers, loans, payments, partners, persist, showToast],
+  )
+
+  const deletePartner = useCallback(
+    (partnerId: string): { ok: true } | { ok: false; error: string } => {
+      const partner = partners.find((p) => p.id === partnerId)
+      if (!partner) return { ok: false, error: 'Partner not found.' }
+
+      const linkedLoans = loans.filter((l) =>
+        (l.partnerShares ?? []).some((s) => s.partnerId === partnerId),
+      )
+      const cleanedLoans = loans.map((loan) => {
+        const shares = (loan.partnerShares ?? []).filter((s) => s.partnerId !== partnerId)
+        if (shares.length === (loan.partnerShares ?? []).length) return loan
+        return normalizeLoan({ ...loan, partnerShares: shares })
+      })
+
+      persist({
+        borrowers,
+        loans: cleanedLoans,
+        payments,
+        partners: partners.filter((p) => p.id !== partnerId),
+      })
+
+      const parts: string[] = [`${partner.name} deleted`]
+      if (linkedLoans.length > 0) {
+        parts.push(
+          `removed from ${linkedLoans.length} loan${linkedLoans.length === 1 ? '' : 's'}`,
+        )
+      }
+      showToast(parts.length > 1 ? `${parts[0]} — ${parts.slice(1).join(', ')}` : parts[0])
+      return { ok: true }
+    },
+    [borrowers, loans, payments, partners, persist, showToast],
   )
 
   const value = useMemo(
@@ -680,13 +1095,20 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       dismissReminder,
       dataLoading,
       dataReady,
+      loadProgress,
+      syncStatus,
+      syncStatusLabel,
+      syncPending: syncMeta.pendingChanges,
+      retrySync,
       getLoansByBorrower,
       getPaymentsByLoan,
       getPaymentsByBorrower,
       recordPayment,
+      recordBorrowerInterestPayment,
       deletePayment,
       deleteLoan,
       deleteBorrower,
+      deletePartner,
       createLoan,
       updateLoan,
       createBorrower,
@@ -694,6 +1116,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       createPartner,
       updatePartner,
       toast,
+      showToast,
       clearToast,
     }),
     [
@@ -712,13 +1135,20 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       dismissReminder,
       dataLoading,
       dataReady,
+      loadProgress,
+      syncStatus,
+      syncStatusLabel,
+      syncMeta,
+      retrySync,
       getLoansByBorrower,
       getPaymentsByLoan,
       getPaymentsByBorrower,
       recordPayment,
+      recordBorrowerInterestPayment,
       deletePayment,
       deleteLoan,
       deleteBorrower,
+      deletePartner,
       createLoan,
       updateLoan,
       createBorrower,
@@ -726,6 +1156,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       createPartner,
       updatePartner,
       toast,
+      showToast,
       clearToast,
     ],
   )
@@ -739,14 +1170,6 @@ function getDefaultPaymentNote(type: PaymentType): string {
   return type === 'interest_only'
     ? 'Interest payment — principal unchanged'
     : 'Full settlement — loan closed'
-}
-
-function formatToastAmount(n: number): string {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(n)
 }
 
 export function useLoanBook() {

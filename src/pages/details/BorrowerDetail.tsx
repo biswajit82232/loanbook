@@ -145,8 +145,12 @@ export function BorrowerDetail({ id }: { id: string }) {
         >
           <BtnIcon icon="pencil">Edit</BtnIcon>
         </button>
-        <button type="button" className="btn btn-secondary" onClick={() => openPaymentForm()}>
-          <BtnIcon icon="wallet">Record payment</BtnIcon>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => openPaymentForm({ borrowerId: person.id })}
+        >
+          <BtnIcon icon="wallet">Pay interest (all loans)</BtnIcon>
         </button>
         <button type="button" className="btn btn-danger" onClick={openDeleteConfirm}>
           <span className="btn-inner">
