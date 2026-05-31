@@ -23,6 +23,8 @@ import {
 
 function attentionKindLabel(kind: DashboardAttentionItem['kind']) {
   switch (kind) {
+    case 'value_limit':
+      return 'Near limit'
     case 'payment_due':
       return 'Overdue'
     case 'payment_due_soon':
@@ -50,6 +52,8 @@ export function Dashboard() {
       ),
     [loans, settings.attentionDismissed, settings.reminderPeriodDays, getBorrower],
   )
+
+  const hasCriticalAttention = attentionItems.some((item) => item.kind === 'value_limit')
 
   const newestLoans = useMemo(
     () => [...loans].sort(compareLoanByStartDateNewest).slice(0, 3),
@@ -79,7 +83,10 @@ export function Dashboard() {
         <header className="attention-panel-head">
           <h2>Needs attention</h2>
           {attentionItems.length > 0 && (
-            <span className="attention-count" aria-label={`${attentionItems.length} items`}>
+            <span
+              className={`attention-count${hasCriticalAttention ? ' attention-count--critical' : ''}`}
+              aria-label={`${attentionItems.length} items`}
+            >
               {attentionItems.length}
             </span>
           )}
@@ -94,11 +101,13 @@ export function Dashboard() {
           <ul className="compact-list attention-list">
             {attentionItems.map((item) => {
               const typeBadge =
-                item.kind === 'payment_due'
-                  ? 'due'
-                  : item.kind === 'payment_due_soon'
-                    ? 'due-soon'
-                    : 'pending'
+                item.kind === 'value_limit'
+                  ? 'danger'
+                  : item.kind === 'payment_due'
+                    ? 'due'
+                    : item.kind === 'payment_due_soon'
+                      ? 'due-soon'
+                      : 'pending'
               return (
                 <li key={item.id} className="attention-list-item">
                   <button

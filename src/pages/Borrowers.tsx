@@ -8,12 +8,12 @@ import { Icon } from '../components/icons'
 import {
   compareBorrowerByLastEdited,
   formatCurrency,
-  getBorrowerInterestDue,
   countOpenLoans,
   getBorrowerLoanCounts,
   getBorrowerOutstanding,
-  getBorrowerPrincipalDue,
+  getBorrowersPageTotals,
 } from '../data/helpers'
+import { KpiCard } from '../components/KpiCard'
 import { useNavigation } from '../context/NavigationContext'
 import { useLoanBook } from '../context/LoanBookContext'
 import { formatDisplayPhone, hasCallablePhone } from '../utils/phone'
@@ -65,8 +65,6 @@ function BorrowerPaginatedList({
             loans.filter((l) => l.borrowerId === b.id),
           )
           const totalDue = getBorrowerOutstanding(loans, b.id)
-          const principalDue = getBorrowerPrincipalDue(loans, b.id)
-          const interestDue = getBorrowerInterestDue(loans, b.id)
 
           return (
             <li key={b.id}>
@@ -112,14 +110,7 @@ function BorrowerPaginatedList({
                   </span>
                   <span className="compact-row-bottom">
                     {totalDue > 0 ? (
-                      <>
-                        <SafeText variant="amount">{formatCurrency(totalDue)} due</SafeText>
-                        {interestDue > 0 && (
-                          <SafeText as="span" className="compact-row-interest" variant="amount">
-                            {formatCurrency(principalDue)} prin. · {formatCurrency(interestDue)} int.
-                          </SafeText>
-                        )}
-                      </>
+                      <SafeText variant="amount">{formatCurrency(totalDue)} total due</SafeText>
                     ) : (
                       <span className="compact-row-muted">No balance due</span>
                     )}
@@ -162,8 +153,29 @@ export function Borrowers() {
     [sortedBorrowers, search],
   )
 
+  const pageTotals = useMemo(
+    () => getBorrowersPageTotals(loans, visibleBorrowers.map((b) => b.id)),
+    [loans, visibleBorrowers],
+  )
+
   return (
     <div className="page">
+      {borrowers.length > 0 && (
+        <section className="kpi-grid kpi-grid--3 borrowers-page-totals">
+          <KpiCard
+            label="Principal due"
+            value={formatCurrency(pageTotals.principalDue)}
+            variant="accent"
+          />
+          <KpiCard
+            label="Interest due"
+            value={formatCurrency(pageTotals.interestDue)}
+            variant="interest"
+          />
+          <KpiCard label="Total due" value={formatCurrency(pageTotals.totalDue)} variant="success" />
+        </section>
+      )}
+
       <div className="page-actions page-actions--compact">
         <button
           type="button"

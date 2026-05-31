@@ -55,6 +55,7 @@ export const seedLoans: Loan[] = [
       { partnerId: 'PR-001', amount: 30000, rate: 1.5, ratePeriod: 'monthly' },
       { partnerId: 'PR-002', amount: 20000, rate: 18, ratePeriod: 'yearly' },
     ],
+    valueLimit: 0,
   },
   {
     id: 'LN-002',
@@ -75,6 +76,7 @@ export const seedLoans: Loan[] = [
       { id: 'I2', periodLabel: 'Jan – May 2026', amount: 1000, status: 'outstanding' },
     ],
     partnerShares: [{ partnerId: 'PR-001', amount: 25000, rate: 1.5, ratePeriod: 'monthly' }],
+    valueLimit: 0,
   },
   {
     id: 'LN-003',
@@ -96,6 +98,7 @@ export const seedLoans: Loan[] = [
       { id: 'I3', periodLabel: 'Jun 2026', amount: 2100, status: 'outstanding' },
     ],
     partnerShares: [{ partnerId: 'PR-002', amount: 12500, rate: 18, ratePeriod: 'yearly' }],
+    valueLimit: 0,
   },
   {
     id: 'LN-004',
@@ -112,6 +115,7 @@ export const seedLoans: Loan[] = [
     interestCollected: 0,
     interestLog: [],
     partnerShares: [],
+    valueLimit: 0,
   },
   {
     id: 'LN-005',
@@ -131,6 +135,7 @@ export const seedLoans: Loan[] = [
       { id: 'I1', periodLabel: 'All interest cleared', amount: 900, status: 'paid', paidOn: '10 Dec 2025' },
     ],
     partnerShares: [],
+    valueLimit: 0,
   },
 ]
 

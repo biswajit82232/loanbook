@@ -698,6 +698,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
         interestCollected: 0,
         interestLog: [],
         partnerShares: input.partnerShares ?? [],
+        valueLimit: Math.max(0, input.valueLimit ?? 0),
       })
 
       persist({ borrowers, loans: [loan, ...loans], payments, partners })
@@ -728,6 +729,10 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
             input.description !== undefined
               ? input.description.trim()
               : loan.description,
+          valueLimit:
+            input.valueLimit !== undefined
+              ? Math.max(0, input.valueLimit)
+              : loan.valueLimit,
         }
         persist({
           borrowers,
@@ -788,6 +793,9 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
 
       if (input.partnerShares !== undefined) {
         updated.partnerShares = input.partnerShares
+      }
+      if (input.valueLimit !== undefined) {
+        updated.valueLimit = Math.max(0, input.valueLimit)
       }
 
       persist({

@@ -347,6 +347,7 @@ export function normalizeLoan(loan: Loan & { description?: string }): Loan {
     interestLog: loan.interestLog ?? [],
     partnerShares: migratePartnerShares(loan),
     description: loan.description?.trim() ?? '',
+    valueLimit: Math.max(0, Number(loan.valueLimit) || 0),
   }
   if (normalized.status === 'Active') {
     normalized = collapseOutstandingInterestLog(normalized)
@@ -603,6 +604,13 @@ export function getBorrowerInterestDue(loans: Loan[], borrowerId: string): numbe
     .reduce((sum, l) => sum + getBuiltUpInterest(l), 0)
 }
 
+/** Sum of value limits on active loans for this borrower (0 if none set). */
+export function getBorrowerTotalValueLimit(loans: Loan[], borrowerId: string): number {
+  return loans
+    .filter((l) => l.borrowerId === borrowerId && l.status === 'Active')
+    .reduce((sum, l) => sum + Math.max(0, l.valueLimit ?? 0), 0)
+}
+
 /** Anchor used to order interest payments (oldest unpaid accrual first). */
 function loanInterestAnchorTime(loan: Loan): number {
   const anchor = loan.lastPaymentDate ?? loan.startDate
@@ -757,6 +765,9 @@ export function validateCreateLoan(
     loanPrincipal,
   )
   if (shareErr) return shareErr
+  if (input.valueLimit !== undefined && input.valueLimit < 0) {
+    return 'Value limit cannot be negative.'
+  }
   return null
 }
 
@@ -774,9 +785,10 @@ export function validateUpdateLoan(
       input.status !== undefined ||
       input.rate !== undefined ||
       input.ratePeriod !== undefined ||
-      input.startDate !== undefined
+      input.startDate !== undefined ||
+      input.partnerShares !== undefined
     ) {
-      return 'Closed loans can only have purpose and description updated.'
+      return 'Closed loans can only have purpose, description, and value limit updated.'
     }
     return null
   }
@@ -816,7 +828,26 @@ export function validateUpdateLoan(
     const shareErr = validatePartnerShares(input.partnerShares, partners, principal)
     if (shareErr) return shareErr
   }
+  if (input.valueLimit !== undefined && input.valueLimit < 0) {
+    return 'Value limit cannot be negative.'
+  }
   return null
+}
+
+/** Totals for active/open loans belonging to the given borrowers. */
+export function getBorrowersPageTotals(loans: Loan[], borrowerIds: string[]) {
+  const idSet = new Set(borrowerIds)
+  const relevant = loans.filter(
+    (l) => idSet.has(l.borrowerId) && l.status === 'Active',
+  )
+  const principalDue = relevant.reduce((s, l) => s + l.principalOutstanding, 0)
+  const interestDue = relevant.reduce((s, l) => s + getBuiltUpInterest(l), 0)
+  return {
+    principalDue,
+    interestDue,
+    totalDue: principalDue + interestDue,
+    activeLoans: relevant.length,
+  }
 }
 
 export function validateCreateBorrower(input: CreateBorrowerInput): string | null {

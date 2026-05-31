@@ -12,3 +12,7 @@ where updated_at is null;
 -- 003: optional loan description
 alter table public.loans
   add column if not exists description text not null default '';
+
+-- 004: alert when principal + interest nears this cap
+alter table public.loans
+  add column if not exists value_limit numeric not null default 0;

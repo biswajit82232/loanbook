@@ -54,6 +54,7 @@ type LoanRow = {
   last_payment_date: string | null
   interest_log: InterestEntry[]
   partner_shares: LoanPartnerShare[]
+  value_limit?: number | null
 }
 
 type PaymentRow = {
@@ -110,6 +111,7 @@ function mapLoan(row: LoanRow): Loan {
     lastPaymentDate: row.last_payment_date ?? undefined,
     interestLog: row.interest_log ?? [],
     partnerShares: row.partner_shares ?? [],
+    valueLimit: Number(row.value_limit ?? 0),
   })
 }
 
@@ -207,6 +209,9 @@ function humanizeSyncError(message: string): string {
   if (message.includes('description') && message.includes('loans')) {
     return `${message} — run supabase/migrations/apply_pending_migrations.sql in Supabase SQL Editor, then reload the app.`
   }
+  if (message.includes('value_limit') && message.includes('loans')) {
+    return `${message} — run supabase/migrations/apply_pending_migrations.sql in Supabase SQL Editor, then reload the app.`
+  }
   return message
 }
 
@@ -277,6 +282,7 @@ export async function syncLoanBook(
     last_payment_date: l.lastPaymentDate ?? null,
     interest_log: l.interestLog,
     partner_shares: l.partnerShares,
+    value_limit: l.valueLimit ?? 0,
   }))
 
   const paymentRows = data.payments.map((p) => ({

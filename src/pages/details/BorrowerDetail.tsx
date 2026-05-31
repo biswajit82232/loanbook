@@ -5,6 +5,7 @@ import {
   getBorrowerInterestDue,
   getBorrowerOutstanding,
   getBorrowerPrincipalDue,
+  getBorrowerTotalValueLimit,
   getLoanLentDays,
   getLoanListAmountLabel,
   getPaymentTypeLabel,
@@ -43,6 +44,7 @@ export function BorrowerDetail({ id }: { id: string }) {
   const borrowerLoans = allBorrowerLoans.filter(isOpenLoan)
   const borrowerPayments = getPaymentsByBorrower(person.id)
   const totalDue = getBorrowerOutstanding(loans, person.id)
+  const totalValueLimit = getBorrowerTotalValueLimit(loans, person.id)
 
   function openDeleteConfirm() {
     setDeleteError('')
@@ -72,10 +74,19 @@ export function BorrowerDetail({ id }: { id: string }) {
           >
             {formatDisplayPhone(person.phone)}
           </p>
+          <p className="detail-hero-due">
+            {totalDue > 0 ? (
+              <SafeText variant="amount">{formatCurrency(totalDue)} total due</SafeText>
+            ) : (
+              <span className="detail-hero-sub--muted">No balance due</span>
+            )}
+          </p>
         </div>
       </div>
 
-      <section className="kpi-grid kpi-grid--3">
+      <section
+        className={`kpi-grid${totalValueLimit > 0 ? ' kpi-grid--4' : ' kpi-grid--3'}`}
+      >
         <KpiCard
           label="Principal due"
           value={formatCurrency(getBorrowerPrincipalDue(loans, person.id))}
@@ -87,6 +98,13 @@ export function BorrowerDetail({ id }: { id: string }) {
           variant="interest"
         />
         <KpiCard label="Total due" value={formatCurrency(totalDue)} variant="success" />
+        {totalValueLimit > 0 && (
+          <KpiCard
+            label="Total value"
+            value={formatCurrency(totalValueLimit)}
+            variant="default"
+          />
+        )}
       </section>
 
       <DetailSection title="Contact">

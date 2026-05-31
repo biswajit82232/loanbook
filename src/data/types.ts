@@ -61,6 +61,8 @@ export interface Loan {
   lastPaymentDate?: string
   interestLog: InterestEntry[]
   partnerShares: LoanPartnerShare[]
+  /** Alert when principal outstanding + interest reaches ~90% of this (0 = off). */
+  valueLimit: number
 }
 
 export interface Payment {
@@ -148,6 +150,7 @@ export interface CreateLoanInput {
   status: 'Active' | 'Pending'
   initialAccruedInterest?: number
   partnerShares?: LoanPartnerShare[]
+  valueLimit?: number
 }
 
 export interface UpdateLoanInput {
@@ -162,6 +165,7 @@ export interface UpdateLoanInput {
   principal?: number
   accruedInterest?: number
   partnerShares?: LoanPartnerShare[]
+  valueLimit?: number
 }
 
 export interface CreateBorrowerInput {

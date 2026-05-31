@@ -7,7 +7,7 @@ import { APP_VERSION } from '../lib/version'
 import {
   formatReminderPeriodLabel,
   getAnchorLabel,
-  getMonthlyLoanReminders,
+  getLoanNotificationReminders,
   borrowerHasPhone,
 } from '../data/reminders'
 import {
@@ -35,7 +35,7 @@ export function TopbarActions() {
   )
   const reminders = useMemo(
     () =>
-      getMonthlyLoanReminders(loans, dismissed, new Date(), settings.reminderPeriodDays),
+      getLoanNotificationReminders(loans, dismissed, new Date(), settings.reminderPeriodDays),
     [loans, dismissed, settings.reminderPeriodDays],
   )
   const showNotifications = updateAvailable || (page === 'dashboard' && !detail)
@@ -168,7 +168,10 @@ export function TopbarActions() {
                   {reminders.map((r) => {
                     const borrower = getBorrower(r.borrowerId)
                     return (
-                      <li key={r.dismissKey} className="topbar-notify-item">
+                      <li
+                        key={r.dismissKey}
+                        className={`topbar-notify-item${r.isCritical ? ' topbar-notify-item--critical' : ''}`}
+                      >
                         <button
                           type="button"
                           className="topbar-notify-main"
@@ -182,9 +185,11 @@ export function TopbarActions() {
                           </span>
                           <span className="topbar-notify-sub">
                             {formatReminderPeriodLabel(r)}
-                            {r.interestDue > 0
-                              ? ` · ${formatCurrency(r.interestDue)} int.`
-                              : ''}
+                            {r.kind === 'value_limit'
+                              ? ` · ${formatCurrency(r.totalDue)} total`
+                              : r.interestDue > 0
+                                ? ` · ${formatCurrency(r.interestDue)} int.`
+                                : ''}
                           </span>
                           <span className="topbar-notify-sub">
                             {getAnchorLabel(r.loan)}

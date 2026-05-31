@@ -1452,6 +1452,34 @@ select {
   border-left: 2px solid #ea580c;
 }
 
+.attention-row--danger {
+  border-left: 2px solid var(--danger);
+  background: color-mix(in srgb, var(--danger) 6%, var(--bg-card));
+}
+
+.badge-danger {
+  background: rgba(248, 113, 113, 0.18);
+  color: var(--danger);
+}
+
+.attention-count--critical {
+  background: color-mix(in srgb, var(--danger) 20%, var(--bg-card));
+  color: var(--danger);
+}
+
+.topbar-notify-item--critical {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: color-mix(in srgb, var(--danger) 6%, var(--bg));
+}
+
+.topbar-notify-item--critical .topbar-notify-title {
+  color: var(--danger);
+}
+
+.borrowers-page-totals {
+  margin-bottom: var(--space-md);
+}
+
 .attention-row--pending {
   border-left: 2px solid var(--accent);
 }
@@ -2491,6 +2519,20 @@ select {
   font-size: 0.9375rem;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.detail-hero-due {
+  margin: 0.5rem 0 0;
+  font-size: clamp(1.125rem, 4vw, 1.5rem);
+  font-weight: 700;
+  color: var(--success);
+  line-height: 1.2;
+}
+
+.detail-hero-due .detail-hero-sub--muted {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text-muted);
 }
 
 .detail-meta {

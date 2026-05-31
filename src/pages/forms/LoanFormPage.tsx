@@ -67,6 +67,9 @@ export function LoanFormPage({ mode, loanId, borrowerId: presetBorrowerId }: Loa
   const [partnerShares, setPartnerShares] = useState<LoanPartnerShare[]>(() =>
     isEdit && existing ? [...(existing.partnerShares ?? [])] : [],
   )
+  const [valueLimit, setValueLimit] = useState(() =>
+    isEdit && existing && existing.valueLimit > 0 ? String(existing.valueLimit) : '',
+  )
   const [error, setError] = useState('')
 
   const hasPayments =
@@ -116,6 +119,13 @@ export function LoanFormPage({ mode, loanId, borrowerId: presetBorrowerId }: Loa
       return
     }
 
+    const valueLimitNum =
+      valueLimit.trim() === '' ? 0 : Number(valueLimit)
+    if (valueLimit.trim() !== '' && (!Number.isFinite(valueLimitNum) || valueLimitNum < 0)) {
+      setError('Enter a valid value limit (or leave empty to turn off).')
+      return
+    }
+
     if (isEdit && existing) {
       const result = updateLoan({
         loanId: existing.id,
@@ -129,6 +139,7 @@ export function LoanFormPage({ mode, loanId, borrowerId: presetBorrowerId }: Loa
         principal: isClosed ? undefined : principalNum,
         accruedInterest: isClosed || !interestChanged || hasPayments ? undefined : interestNum,
         partnerShares: isClosed ? undefined : validShares,
+        valueLimit: valueLimitNum,
       })
       if (result.ok) goBack()
       else setError(result.error)
@@ -146,6 +157,7 @@ export function LoanFormPage({ mode, loanId, borrowerId: presetBorrowerId }: Loa
       status,
       initialAccruedInterest: 0,
       partnerShares: validShares,
+      valueLimit: valueLimitNum,
     })
     if (result.ok) goBack()
     else setError(result.error)
@@ -227,6 +239,22 @@ export function LoanFormPage({ mode, loanId, borrowerId: presetBorrowerId }: Loa
               disabled={isEdit && hasPayments}
             />
 
+            <label className="field">
+              <span className="field-label">Value limit (₹)</span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={valueLimit}
+                onChange={(e) => setValueLimit(e.target.value)}
+                placeholder="Optional — alert near limit"
+              />
+              <span className="field-hint">
+                Red alert when principal due + interest reaches 90% of this amount. Leave empty to
+                disable.
+              </span>
+            </label>
+
             <OptionButtons
               label="Status"
               value={status}
@@ -257,6 +285,23 @@ export function LoanFormPage({ mode, loanId, borrowerId: presetBorrowerId }: Loa
               defaultRatePeriod={ratePeriod}
             />
           </>
+        )}
+
+        {isClosed && (
+          <label className="field">
+            <span className="field-label">Value limit (₹)</span>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={valueLimit}
+              onChange={(e) => setValueLimit(e.target.value)}
+              placeholder="Optional — alert near limit"
+            />
+            <span className="field-hint">
+              Red alert when principal due + interest reaches 90% of this amount.
+            </span>
+          </label>
         )}
 
         <label className="field">
