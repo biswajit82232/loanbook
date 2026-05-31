@@ -1,4 +1,5 @@
 import { BtnIcon } from '../components/BtnIcon'
+import { SafeText } from '../components/SafeText'
 import { formatCurrency, getPaymentTypeLabel } from '../data/helpers'
 import { useNavigation } from '../context/NavigationContext'
 import { useLoanBook } from '../context/LoanBookContext'
@@ -36,24 +37,28 @@ export function Payments() {
                   onClick={() => openDetail({ type: 'payment', id: p.id })}
                 >
                   <div className="compact-row-top">
-                    <span className="compact-row-id">{p.id}</span>
+                    <SafeText as="span" className="compact-row-id">
+                      {p.id}
+                    </SafeText>
                     <span className={`badge badge-${typeBadge}`}>
                       {getPaymentTypeLabel(p.type)}
                     </span>
                   </div>
                   <div className="compact-row-mid">
-                    <span className="compact-row-name">{borrower?.name ?? '—'}</span>
+                    <SafeText as="span" className="compact-row-name">
+                      {borrower?.name ?? '—'}
+                    </SafeText>
                     <span className="compact-row-dot">·</span>
                     <span className="compact-row-days">{p.date}</span>
                     <span className="compact-row-dot">·</span>
                     <span className="compact-row-days">{p.mode}</span>
                   </div>
                   <div className="compact-row-bottom">
-                    <span>{formatCurrency(p.amount)}</span>
+                    <SafeText variant="amount">{formatCurrency(p.amount)}</SafeText>
                     {p.type === 'interest_only' && p.interestAmount > 0 && (
-                      <span className="compact-row-interest">
+                      <SafeText as="span" className="compact-row-interest" variant="amount">
                         {formatCurrency(p.interestAmount)} int.
-                      </span>
+                      </SafeText>
                     )}
                   </div>
                 </button>

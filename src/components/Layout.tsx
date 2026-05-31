@@ -1,4 +1,7 @@
-import { useState, useEffect, type ReactNode } from 'react'
+import { useMemo, useState, useEffect, type ReactNode } from 'react'
+import { getLoansForPartner } from '../data/helpers'
+import { CountBadge } from './CountBadge'
+import { SafeText } from './SafeText'
 import { Icon } from './icons'
 import { Sidebar } from './Sidebar'
 import { TopbarActions } from './TopbarActions'
@@ -7,8 +10,22 @@ import { useNavigation } from '../context/NavigationContext'
 import { NAV_ITEMS } from '../constants/navigation'
 
 export function Layout({ children }: { children: ReactNode }) {
-  const { settings } = useLoanBook()
-  const { page, title, canGoBack, setPage, goBack } = useNavigation()
+  const { settings, loans } = useLoanBook()
+  const { page, title, canGoBack, detail, setPage, goBack } = useNavigation()
+  const loanCount = loans.length
+
+  const topbarLoanCount = useMemo(() => {
+    if (!detail) {
+      return page === 'loans' ? loanCount : undefined
+    }
+    if (detail.type === 'borrower') {
+      return loans.filter((l) => l.borrowerId === detail.id).length
+    }
+    if (detail.type === 'partner') {
+      return getLoansForPartner(detail.id, loans).length
+    }
+    return undefined
+  }, [detail, page, loans, loanCount])
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
@@ -61,7 +78,14 @@ export function Layout({ children }: { children: ReactNode }) {
               <Icon name="menu" size={20} className="menu-icon" />
             </button>
           )}
-          <h1 className="page-title">{title}</h1>
+          <h1 className="page-title">
+            <SafeText as="span" className="page-title-text">
+              {title}
+            </SafeText>
+            {topbarLoanCount !== undefined && (
+              <CountBadge count={topbarLoanCount} label={`${topbarLoanCount} loans`} />
+            )}
+          </h1>
           <TopbarActions />
         </header>
 

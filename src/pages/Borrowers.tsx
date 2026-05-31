@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import { BtnIcon } from '../components/BtnIcon'
+import { CountBadge } from '../components/CountBadge'
+import { SafeText } from '../components/SafeText'
 import { Icon } from '../components/icons'
 import {
   formatCurrency,
@@ -117,7 +119,17 @@ export function Borrowers() {
                   </span>
                   <span className="compact-row-main">
                     <span className="compact-row-top">
-                      <span className="compact-row-id">{b.name}</span>
+                      <span className="compact-row-title-group">
+                        <SafeText as="span" className="compact-row-id">
+                          {b.name}
+                        </SafeText>
+                        {loanCount > 0 && (
+                          <CountBadge
+                            count={loanCount}
+                            label={`${loanCount} loan${loanCount === 1 ? '' : 's'}`}
+                          />
+                        )}
+                      </span>
                       {totalDue > 0 ? (
                         <span className="badge badge-due">Due</span>
                       ) : activeLoans > 0 ? (
@@ -136,26 +148,16 @@ export function Borrowers() {
                       </span>
                       <span className="compact-row-dot">·</span>
                       <span className="compact-row-days">{b.id}</span>
-                      {loanCount > 0 && (
-                        <>
-                          <span className="compact-row-dot">·</span>
-                          <span className="compact-row-days">
-                            {activeLoans > 0
-                              ? `${activeLoans} active loan${activeLoans === 1 ? '' : 's'}`
-                              : `${loanCount} loan${loanCount === 1 ? '' : 's'}`}
-                          </span>
-                        </>
-                      )}
                     </span>
                     <span className="compact-row-bottom">
                       {totalDue > 0 ? (
                         <>
-                          <span>{formatCurrency(totalDue)} due</span>
+                          <SafeText variant="amount">{formatCurrency(totalDue)} due</SafeText>
                           {interestDue > 0 && (
-                            <span className="compact-row-interest">
+                            <SafeText as="span" className="compact-row-interest" variant="amount">
                               {formatCurrency(principalDue)} prin. · {formatCurrency(interestDue)}{' '}
                               int.
-                            </span>
+                            </SafeText>
                           )}
                         </>
                       ) : (

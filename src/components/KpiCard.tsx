@@ -1,3 +1,5 @@
+import { SafeText } from './SafeText'
+
 interface KpiCardProps {
   label: string
   value: string | number
@@ -7,8 +9,10 @@ interface KpiCardProps {
 export function KpiCard({ label, value, variant = 'default' }: KpiCardProps) {
   return (
     <article className={`kpi-card kpi-card--${variant}`}>
-      <p className="kpi-label">{label}</p>
-      <p className="kpi-value">{value}</p>
+      <p className="kpi-label text-safe">{label}</p>
+      <SafeText as="p" className="kpi-value" variant="amount">
+        {value}
+      </SafeText>
     </article>
   )
 }

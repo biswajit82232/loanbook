@@ -3,6 +3,8 @@ import { Icon } from '../components/icons'
 import { useNavigation } from '../context/NavigationContext'
 import { useLoanBook } from '../context/LoanBookContext'
 import { KpiCard } from '../components/KpiCard'
+import { SafeAmount } from '../components/SafeAmount'
+import { SafeText } from '../components/SafeText'
 import { formatCurrency, getPaymentTypeLabel, getPortfolioStats } from '../data/helpers'
 import {
   getDashboardAttentionItems,
@@ -102,12 +104,18 @@ export function Dashboard() {
                       <Icon name="chevron-right" size={18} className="attention-card-chevron" />
                     </div>
 
-                    <h3 className="attention-card-name">{item.borrowerName}</h3>
-                    <p className="attention-card-reason">{item.reason}</p>
-                    <p className="attention-card-context">{item.context}</p>
+                    <SafeText as="h3" className="attention-card-name">
+                      {item.borrowerName}
+                    </SafeText>
+                    <SafeText as="p" className="attention-card-reason">
+                      {item.reason}
+                    </SafeText>
+                    <SafeText as="p" className="attention-card-context">
+                      {item.context}
+                    </SafeText>
 
                     <div className="attention-card-amount-block">
-                      <span className="attention-card-amount">{formatCurrency(item.amount)}</span>
+                      <SafeAmount amount={item.amount} className="attention-card-amount" />
                       <span className="attention-card-amount-caption">{item.amountCaption}</span>
                     </div>
                   </button>
@@ -135,10 +143,10 @@ export function Dashboard() {
                     <Icon name="receipt" size={18} />
                   </span>
                   <div>
-                    <strong>{getPaymentTypeLabel(p.type)}</strong>
-                    <span>
+                    <SafeText as="strong">{getPaymentTypeLabel(p.type)}</SafeText>
+                    <SafeText as="span" variant="amount">
                       {formatCurrency(p.amount)} · {p.date}
-                    </span>
+                    </SafeText>
                   </div>
                 </button>
               </li>

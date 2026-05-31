@@ -10,6 +10,7 @@ import { useNavigation } from '../../context/NavigationContext'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Icon } from '../../components/icons'
 import { DetailField, DetailGrid, DetailSection } from '../../components/DetailSection'
+import { SafeAmount } from '../../components/SafeAmount'
 import { KpiCard } from '../../components/KpiCard'
 import { LinkCard } from '../../components/LinkCard'
 
@@ -50,7 +51,7 @@ export function PaymentDetail({ id }: { id: string }) {
         <span className={`badge badge-${isSettlement ? 'settlement' : 'interest'}`}>
           {getPaymentTypeLabel(payment.type)}
         </span>
-        <p className="detail-hero-amount">{formatCurrency(payment.amount)}</p>
+        <SafeAmount as="p" amount={payment.amount} className="detail-hero-amount" />
         <p className="detail-hero-sub">{payment.date}</p>
       </div>
 

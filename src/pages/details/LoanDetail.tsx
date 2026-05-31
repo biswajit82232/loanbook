@@ -21,6 +21,7 @@ import { useLoanBook } from '../../context/LoanBookContext'
 import { DetailField, DetailGrid, DetailSection } from '../../components/DetailSection'
 import { KpiCard } from '../../components/KpiCard'
 import { LinkCard } from '../../components/LinkCard'
+import { SafeAmount } from '../../components/SafeAmount'
 
 export function LoanDetail({ id }: { id: string }) {
   const { openPaymentForm, openLoanForm, goBack } = useNavigation()
@@ -62,8 +63,8 @@ export function LoanDetail({ id }: { id: string }) {
     <div className="page detail-page">
       <div className="detail-hero">
         <span className={`badge badge-${loan.status.toLowerCase()}`}>{loan.status}</span>
-        <p className="detail-hero-amount">{formatCurrency(loan.principal)}</p>
-        <p className="detail-hero-sub">
+        <SafeAmount amount={loan.principal} className="detail-hero-amount" />
+        <p className="detail-hero-sub text-safe">
           {loan.purpose && <>{loan.purpose}</>}
           {loan.status !== 'Pending' && daysLent !== null && (
             <>

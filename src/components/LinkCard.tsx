@@ -1,6 +1,7 @@
 import type { DetailRoute } from '../context/NavigationContext'
 import { useNavigation } from '../context/NavigationContext'
 import { Icon } from './icons'
+import { SafeText } from './SafeText'
 
 interface LinkCardProps {
   title: string
@@ -19,10 +20,14 @@ export function LinkCard({ title, subtitle, meta, route }: LinkCardProps) {
       onClick={() => openDetail(route)}
     >
       <div className="link-card-body">
-        <strong>{title}</strong>
-        <span>{subtitle}</span>
+        <SafeText as="strong">{title}</SafeText>
+        <SafeText as="span">{subtitle}</SafeText>
       </div>
-      {meta && <span className="link-card-meta">{meta}</span>}
+      {meta && (
+        <SafeText as="span" className="link-card-meta" variant="amount">
+          {meta}
+        </SafeText>
+      )}
       <Icon name="chevron-right" size={20} className="link-card-chevron" />
     </button>
   )

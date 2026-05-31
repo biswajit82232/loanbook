@@ -16,6 +16,7 @@ import { useNavigation } from '../../context/NavigationContext'
 import { useLoanBook } from '../../context/LoanBookContext'
 import { DetailField, DetailGrid, DetailSection } from '../../components/DetailSection'
 import { KpiCard } from '../../components/KpiCard'
+import { SafeText } from '../../components/SafeText'
 import { LinkCard } from '../../components/LinkCard'
 import { formatDisplayPhone } from '../../utils/phone'
 
@@ -61,7 +62,9 @@ export function BorrowerDetail({ id }: { id: string }) {
       <div className="detail-hero borrower-hero">
         <div className="avatar avatar-lg">{person.name.charAt(0)}</div>
         <div className="detail-hero-text">
-          <p className="detail-hero-amount">{person.name}</p>
+          <SafeText as="p" className="detail-hero-amount">
+            {person.name}
+          </SafeText>
           <p
             className={`detail-hero-sub${!person.phone.trim() ? ' detail-hero-sub--muted' : ''}`}
           >
@@ -91,7 +94,11 @@ export function BorrowerDetail({ id }: { id: string }) {
         </DetailGrid>
       </DetailSection>
 
-      <DetailSection title="Loans">
+      <DetailSection
+        title="Loans"
+        count={borrowerLoans.length}
+        countLabel={`${borrowerLoans.length} loans`}
+      >
         <div className="link-card-list">
           {borrowerLoans.map((loan) => (
             <LinkCard

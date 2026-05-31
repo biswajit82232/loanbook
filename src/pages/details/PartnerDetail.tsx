@@ -13,6 +13,7 @@ import { BtnIcon } from '../../components/BtnIcon'
 import { useNavigation } from '../../context/NavigationContext'
 import { useLoanBook } from '../../context/LoanBookContext'
 import { KpiCard } from '../../components/KpiCard'
+import { SafeText } from '../../components/SafeText'
 import { DetailField, DetailGrid, DetailSection } from '../../components/DetailSection'
 import { LinkCard } from '../../components/LinkCard'
 
@@ -34,7 +35,9 @@ export function PartnerDetail({ id }: { id: string }) {
       <div className="detail-hero borrower-hero">
         <div className="avatar avatar-lg">{partner.name.charAt(0)}</div>
         <div className="detail-hero-text">
-          <p className="detail-hero-amount">{partner.name}</p>
+          <SafeText as="p" className="detail-hero-amount">
+            {partner.name}
+          </SafeText>
           <p
             className={`detail-hero-sub${!partner.phone.trim() ? ' detail-hero-sub--muted' : ''}`}
           >
@@ -56,7 +59,11 @@ export function PartnerDetail({ id }: { id: string }) {
         </DetailGrid>
       </DetailSection>
 
-      <DetailSection title="Loans">
+      <DetailSection
+        title="Loans"
+        count={partnerLoans.length}
+        countLabel={`${partnerLoans.length} loans`}
+      >
         {partnerLoans.length === 0 ? (
           <p className="empty-inline">No loans</p>
         ) : (

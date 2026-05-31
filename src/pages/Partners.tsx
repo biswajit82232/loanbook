@@ -1,5 +1,8 @@
+import { CountBadge } from '../components/CountBadge'
+import { SafeText } from '../components/SafeText'
 import {
   formatCurrency,
+  getLoansForPartner,
   getPartnerInterestDue,
   getPartnerPortfolioStats,
   getPartnerPrincipalDeployed,
@@ -44,6 +47,7 @@ export function Partners() {
           {partners.map((partner) => {
             const deployed = getPartnerPrincipalDeployed(partner.id, loans)
             const interestDue = getPartnerInterestDue(partner.id, loans)
+            const partnerLoanCount = getLoansForPartner(partner.id, loans).length
 
             return (
               <li key={partner.id}>
@@ -53,7 +57,17 @@ export function Partners() {
                   onClick={() => openDetail({ type: 'partner', id: partner.id })}
                 >
                   <div className="compact-row-top">
-                    <span className="compact-row-id">{partner.name}</span>
+                    <span className="compact-row-title-group">
+                      <SafeText as="span" className="compact-row-id">
+                        {partner.name}
+                      </SafeText>
+                      {partnerLoanCount > 0 && (
+                        <CountBadge
+                          count={partnerLoanCount}
+                          label={`${partnerLoanCount} loan${partnerLoanCount === 1 ? '' : 's'}`}
+                        />
+                      )}
+                    </span>
                     <span className={`badge badge-${partner.status.toLowerCase()}`}>
                       {partner.status}
                     </span>
@@ -64,10 +78,10 @@ export function Partners() {
                     <span className="compact-row-days">{partner.id}</span>
                   </div>
                   <div className="compact-row-bottom">
-                    <span>{formatCurrency(deployed)} deployed</span>
-                    <span className="compact-row-interest">
+                    <SafeText variant="amount">{formatCurrency(deployed)} deployed</SafeText>
+                    <SafeText as="span" className="compact-row-interest" variant="amount">
                       {formatCurrency(interestDue)} due
-                    </span>
+                    </SafeText>
                   </div>
                 </button>
               </li>

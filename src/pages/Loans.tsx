@@ -6,6 +6,7 @@ import {
   getLoanListAmountLabel,
 } from '../data/helpers'
 import { BtnIcon } from '../components/BtnIcon'
+import { SafeText } from '../components/SafeText'
 import { useNavigation } from '../context/NavigationContext'
 import { useLoanBook } from '../context/LoanBookContext'
 
@@ -39,25 +40,29 @@ export function Loans() {
                   onClick={() => openDetail({ type: 'loan', id: loan.id })}
                 >
                   <div className="compact-row-top">
-                    <span className="compact-row-id">{loan.id}</span>
+                    <SafeText as="span" className="compact-row-id">
+                      {loan.id}
+                    </SafeText>
                     <span className={`badge badge-${loan.status.toLowerCase()}`}>{loan.status}</span>
                   </div>
                   <div className="compact-row-mid">
-                    <span className="compact-row-name">{borrower?.name ?? '—'}</span>
+                    <SafeText as="span" className="compact-row-name">
+                      {borrower?.name ?? '—'}
+                    </SafeText>
                     {days !== '—' && <span className="compact-row-dot">·</span>}
                     {days !== '—' && <span className="compact-row-days">{days}</span>}
                   </div>
                   <div className="compact-row-bottom">
-                    <span className="compact-row-principal">
+                    <SafeText as="span" className="compact-row-principal" variant="amount">
                       {getLoanListAmountLabel(loan)}
                       {loan.status !== 'Pending' && (
                         <span className="compact-row-principal-label"> lent</span>
                       )}
-                    </span>
+                    </SafeText>
                     {loan.status === 'Active' && interest > 0 && (
-                      <span className="compact-row-interest">
+                      <SafeText as="span" className="compact-row-interest" variant="amount">
                         · {formatCurrency(interest)} int.
-                      </span>
+                      </SafeText>
                     )}
                   </div>
                 </button>
