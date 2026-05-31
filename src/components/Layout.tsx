@@ -45,9 +45,9 @@ export function Layout({ children }: { children: ReactNode }) {
               type="button"
               className="back-btn"
               onClick={goBack}
-              aria-label="Back"
+              aria-label="Go back"
             >
-              <Icon name="chevron-left" size={20} className="back-btn-icon" />
+              <Icon name="chevron-left" size={22} className="back-btn-icon" aria-hidden />
               <span className="back-btn-label">Back</span>
             </button>
           ) : (

@@ -252,11 +252,10 @@ export function getLoanTotalDue(loan: Loan, asOf: Date = new Date()): number {
   return loan.principalOutstanding + getBuiltUpInterest(loan, asOf)
 }
 
-/** Amount to show on loan lists (not full due for pending disbursement). */
+/** Original principal lent — for loan lists (interest/due shown separately). */
 export function getLoanListAmountLabel(loan: Loan): string {
   if (loan.status === 'Pending') return 'Pending'
-  if (loan.status === 'Closed') return formatCurrency(loan.principal)
-  return formatCurrency(getLoanTotalDue(loan))
+  return formatCurrency(loan.principal ?? 0)
 }
 
 export function normalizeLoan(loan: Loan): Loan {

@@ -48,10 +48,15 @@ export function Loans() {
                     {days !== '—' && <span className="compact-row-days">{days}</span>}
                   </div>
                   <div className="compact-row-bottom">
-                    <span>{getLoanListAmountLabel(loan)}</span>
+                    <span className="compact-row-principal">
+                      {getLoanListAmountLabel(loan)}
+                      {loan.status !== 'Pending' && (
+                        <span className="compact-row-principal-label"> lent</span>
+                      )}
+                    </span>
                     {loan.status === 'Active' && interest > 0 && (
                       <span className="compact-row-interest">
-                        +{formatCurrency(interest)} int.
+                        · {formatCurrency(interest)} int.
                       </span>
                     )}
                   </div>
