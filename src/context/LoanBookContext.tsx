@@ -924,7 +924,8 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       const loan = loans.find((l) => l.id === input.loanId)
       if (!loan) return { ok: false, error: 'Loan not found.' }
 
-      const amounts = buildPaymentAmounts(loan, input.type, input.amount)
+      const payDate = input.date ? parseAppDate(input.date) ?? new Date() : new Date()
+      const amounts = buildPaymentAmounts(loan, input.type, input.amount, payDate)
       if ('error' in amounts) return { ok: false, error: amounts.error }
 
       const paymentId = nextPaymentId(payments)
@@ -942,7 +943,9 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
         notes: input.notes?.trim() || getDefaultPaymentNote(input.type),
       }
 
-      const updatedLoan = normalizeLoan(applyPaymentToLoan(loan, payment))
+      // Recompute from payments by date so backdated entries don't inflate interest.
+      const loanPayments = [payment, ...payments.filter((p) => p.loanId === loan.id)]
+      const updatedLoan = recomputeLoanFromPayments(loan, loanPayments)
       persist({
         borrowers,
         loans: loans.map((l) => (l.id === loan.id ? updatedLoan : l)),
@@ -970,6 +973,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
       if (!plan.ok) return { ok: false, error: plan.error }
 
       const payDate = input.date || formatDisplayDate()
+      const payAsOf = parseAppDate(payDate) ?? new Date()
       const batchId = `BATCH-${Date.now()}`
       const sharedRef = input.reference?.trim() || '—'
       const noteBase =
@@ -985,7 +989,7 @@ export function LoanBookProvider({ children }: { children: ReactNode }) {
         const loan = nextLoans.find((l) => l.id === loanId)
         if (!loan) return { ok: false, error: `Loan ${loanId} not found.` }
 
-        const amounts = buildPaymentAmounts(loan, 'interest_only', amount)
+        const amounts = buildPaymentAmounts(loan, 'interest_only', amount, payAsOf)
         if ('error' in amounts) return { ok: false, error: amounts.error }
 
         const payment: Payment = {

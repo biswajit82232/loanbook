@@ -392,15 +392,16 @@ export function buildPaymentAmounts(
   loan: Loan,
   type: PaymentType,
   amount: number,
+  asOf: Date = new Date(),
 ): { interestAmount: number; principalAmount: number; total: number } | { error: string } {
   if (loan.status !== 'Active') {
     return { error: 'Payments are only allowed on active loans.' }
   }
 
-  const builtUp = getBuiltUpInterest(loan)
+  const builtUp = getBuiltUpInterest(loan, asOf)
 
   if (type === 'full_settlement') {
-    const total = getLoanTotalDue(loan)
+    const total = getLoanTotalDue(loan, asOf)
     if (Math.abs(amount - total) > 1) {
       return {
         error: `Full settlement must be exactly ${formatCurrency(total)} (principal + interest).`,
@@ -442,7 +443,8 @@ export function applyPaymentToLoan(loan: Loan, payment: Payment): Loan {
     }
   }
 
-  const priorDue = getBuiltUpInterest(loan)
+  const payDate = parseAppDate(payment.date) ?? new Date()
+  const priorDue = getBuiltUpInterest(loan, payDate)
   const remainingDue = Math.max(0, priorDue - payment.interestAmount)
   const interestLog = pruneZeroOutstandingLog(
     applyInterestToLog(loan.interestLog ?? [], payment.interestAmount, payment.date).filter(
@@ -633,6 +635,7 @@ export function planBorrowerInterestPayment(
   loans: Loan[],
   borrowerId: string,
   amount: number,
+  asOf: Date = new Date(),
 ): PlanBorrowerInterestPaymentResult {
   if (!Number.isFinite(amount) || amount <= 0) {
     return { ok: false, error: 'Enter an amount greater than zero.' }
@@ -646,7 +649,7 @@ export function planBorrowerInterestPayment(
   }
 
   const withDue = active
-    .map((loan) => ({ loan, due: getBuiltUpInterest(loan) }))
+    .map((loan) => ({ loan, due: getBuiltUpInterest(loan, asOf) }))
     .filter((row) => row.due > 0)
 
   const totalDue = withDue.reduce((sum, row) => sum + row.due, 0)

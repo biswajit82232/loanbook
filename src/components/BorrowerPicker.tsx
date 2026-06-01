@@ -6,6 +6,7 @@ interface BorrowerPickerProps {
   borrowers: Borrower[]
   value: string
   onChange: (borrowerId: string) => void
+  onCreateNew?: (name: string) => void
   disabled?: boolean
   required?: boolean
 }
@@ -15,6 +16,7 @@ export function BorrowerPicker({
   borrowers,
   value,
   onChange,
+  onCreateNew,
   disabled,
   required,
 }: BorrowerPickerProps) {
@@ -98,7 +100,18 @@ export function BorrowerPicker({
         </ul>
       )}
       {open && !disabled && normalized.length > 0 && filtered.length === 0 && (
-        <p className="picker-empty">No borrower found</p>
+        <div className="picker-empty">
+          <p>No borrower found</p>
+          {onCreateNew && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onMouseDown={() => onCreateNew(query.trim())}
+            >
+              Add new borrower
+            </button>
+          )}
+        </div>
       )}
     </div>
   )

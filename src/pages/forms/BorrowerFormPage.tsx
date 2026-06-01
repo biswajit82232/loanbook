@@ -5,16 +5,17 @@ import { useNavigation } from '../../context/NavigationContext'
 interface BorrowerFormPageProps {
   mode: 'create' | 'edit'
   borrowerId?: string
+  initialName?: string
 }
 
-export function BorrowerFormPage({ mode, borrowerId }: BorrowerFormPageProps) {
+export function BorrowerFormPage({ mode, borrowerId, initialName }: BorrowerFormPageProps) {
   const { getBorrower, createBorrower, updateBorrower } = useLoanBook()
   const { goBack } = useNavigation()
 
   const isEdit = mode === 'edit'
   const existing = isEdit && borrowerId ? getBorrower(borrowerId) : undefined
 
-  const [name, setName] = useState(() => (existing ? existing.name : ''))
+  const [name, setName] = useState(() => (existing ? existing.name : (initialName ?? '')))
   const [phone, setPhone] = useState(() => (existing ? existing.phone : ''))
   const [address, setAddress] = useState(() =>
     existing && existing.address !== '—' ? existing.address : '',

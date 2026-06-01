@@ -10,7 +10,7 @@ import {
 } from '../../data/helpers'
 import { useLoanBook } from '../../context/LoanBookContext'
 import { useNavigation } from '../../context/NavigationContext'
-import { formatDisplayDateFromInput, toInputDate } from '../../utils/dateInput'
+import { formatDisplayDateFromInput, parseInputDate, toInputDate } from '../../utils/dateInput'
 import { LoanPicker } from '../../components/LoanPicker'
 import { BorrowerPicker } from '../../components/BorrowerPicker'
 import { OptionButtons } from '../../components/OptionButtons'
@@ -79,10 +79,11 @@ function RecordBorrowerInterestForm({ initialBorrowerId }: { initialBorrowerId?:
   const [error, setError] = useState('')
 
   const payAmount = Number(amount)
+  const asOf = useMemo(() => parseInputDate(date) ?? new Date(), [date])
   const plan = useMemo(() => {
     if (!borrowerId || !Number.isFinite(payAmount) || payAmount <= 0) return null
-    return planBorrowerInterestPayment(loans, borrowerId, payAmount)
-  }, [borrowerId, loans, payAmount])
+    return planBorrowerInterestPayment(loans, borrowerId, payAmount, asOf)
+  }, [borrowerId, loans, payAmount, asOf])
 
   function handleBorrowerChange(id: string) {
     setBorrowerId(id)
@@ -248,8 +249,9 @@ function RecordSingleLoanForm({
   const [error, setError] = useState('')
 
   const loan = loanId ? getLoan(loanId) : undefined
-  const totalDue = loan ? getLoanTotalDue(loan) : 0
-  const interestDue = loan ? getBuiltUpInterest(loan) : 0
+  const asOf = useMemo(() => parseInputDate(date) ?? new Date(), [date])
+  const totalDue = loan ? getLoanTotalDue(loan, asOf) : 0
+  const interestDue = loan ? getBuiltUpInterest(loan, asOf) : 0
 
   const inactiveInitialLoan =
     Boolean(initialLoanId) && !activeLoans.some((l) => l.id === initialLoanId)
@@ -260,8 +262,8 @@ function RecordSingleLoanForm({
     if (!selected) return
     setAmount(
       type === 'full_settlement'
-        ? String(getLoanTotalDue(selected))
-        : String(getBuiltUpInterest(selected)),
+        ? String(getLoanTotalDue(selected, asOf))
+        : String(getBuiltUpInterest(selected, asOf)),
     )
   }
 
@@ -269,7 +271,9 @@ function RecordSingleLoanForm({
     setType(next)
     if (!loan) return
     setAmount(
-      next === 'full_settlement' ? String(getLoanTotalDue(loan)) : String(getBuiltUpInterest(loan)),
+      next === 'full_settlement'
+        ? String(getLoanTotalDue(loan, asOf))
+        : String(getBuiltUpInterest(loan, asOf)),
     )
   }
 
@@ -289,14 +293,14 @@ function RecordSingleLoanForm({
     }
 
     const payAmount =
-      type === 'full_settlement' ? getLoanTotalDue(selected) : Number(amount)
+      type === 'full_settlement' ? getLoanTotalDue(selected, asOf) : Number(amount)
 
     if (!Number.isFinite(payAmount) || payAmount <= 0) {
       setError('Enter a valid amount.')
       return
     }
 
-    const preview = buildPaymentAmounts(selected, type, payAmount)
+    const preview = buildPaymentAmounts(selected, type, payAmount, asOf)
     if ('error' in preview) {
       setError(preview.error)
       return

@@ -28,7 +28,7 @@ export type DetailRoute =
     }
   | { type: 'loan-form'; mode: 'create'; borrowerId?: string }
   | { type: 'loan-form'; mode: 'edit'; id: string }
-  | { type: 'borrower-form'; mode: 'create' }
+  | { type: 'borrower-form'; mode: 'create'; prefillName?: string }
   | { type: 'borrower-form'; mode: 'edit'; id: string }
   | { type: 'partner-form'; mode: 'create' }
   | { type: 'partner-form'; mode: 'edit'; id: string }
@@ -57,7 +57,11 @@ interface NavigationContextValue {
     loanId?: string
     borrowerId?: string
   }) => void
-  openBorrowerForm: (opts: { mode: 'create' | 'edit'; borrowerId?: string }) => void
+  openBorrowerForm: (opts: {
+    mode: 'create' | 'edit'
+    borrowerId?: string
+    prefillName?: string
+  }) => void
   openPartnerForm: (opts: { mode: 'create' | 'edit'; partnerId?: string }) => void
   goBack: () => void
 }
@@ -365,11 +369,15 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   )
 
   const openBorrowerForm = useCallback(
-    (opts: { mode: 'create' | 'edit'; borrowerId?: string }) => {
+    (opts: { mode: 'create' | 'edit'; borrowerId?: string; prefillName?: string }) => {
       if (opts.mode === 'edit' && opts.borrowerId) {
         navigateTo({ type: 'borrower-form', mode: 'edit', id: opts.borrowerId })
       } else {
-        navigateTo({ type: 'borrower-form', mode: 'create' })
+        navigateTo({
+          type: 'borrower-form',
+          mode: 'create',
+          prefillName: opts.prefillName?.trim() || undefined,
+        })
       }
     },
     [navigateTo],

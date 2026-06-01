@@ -192,6 +192,7 @@ export function LoanFormPage({ mode, loanId, borrowerId: presetBorrowerId }: Loa
               borrowers={borrowers}
               value={borrowerId}
               onChange={setBorrowerId}
+              onCreateNew={(name) => openBorrowerForm({ mode: 'create', prefillName: name })}
               disabled={isEdit && hasPayments}
               required
             />

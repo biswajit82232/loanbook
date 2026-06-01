@@ -44,6 +44,7 @@ export function DetailRouter({ route }: { route: DetailRoute }) {
         <BorrowerFormPage
           mode={route.mode}
           borrowerId={route.mode === 'edit' ? route.id : undefined}
+          initialName={route.mode === 'create' ? route.prefillName : undefined}
         />
       )
     case 'partner-form':
