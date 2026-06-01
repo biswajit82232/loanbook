@@ -74,7 +74,7 @@ export function TopbarActions() {
     const loan = loans.find((l) => l.id === loanId)
     const borrower = getBorrower(borrowerId)
     if (!loan || !borrower) return
-    const message = buildLoanReminderMessage(borrower, loan, settings.businessName)
+    const message = buildLoanReminderMessage(borrower, loan)
     if (!openWhatsApp(borrower.phone, message)) {
       showToast('Could not open WhatsApp. Check the phone number.', 'warning')
     }
@@ -87,11 +87,7 @@ export function TopbarActions() {
     }
     if (contextBorrower && borrowerDetail) {
       const borrowerLoans = getLoansByBorrower(contextBorrower.id)
-      const message = buildBorrowerReminderMessage(
-        contextBorrower,
-        borrowerLoans,
-        settings.businessName,
-      )
+      const message = buildBorrowerReminderMessage(contextBorrower, borrowerLoans)
       if (!openWhatsApp(contextBorrower.phone, message)) {
         showToast('Could not open WhatsApp. Check the phone number.', 'warning')
       }

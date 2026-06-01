@@ -24,32 +24,26 @@ function loanDetailsBlock(loan: Loan): string[] {
   ]
 }
 
-function messageClosing(businessName: string): string[] {
+function messageClosing(): string[] {
   return [
     '',
     'Kindly arrange payment of the interest due at your earliest convenience.',
     '',
     'Thank you for your cooperation.',
-    '',
-    'Regards,',
-    businessName,
   ]
 }
 
 export function buildLoanReminderMessage(
   borrower: Borrower,
   loan: Loan,
-  businessName: string,
 ): string {
   const lines = [
     `Dear ${borrower.name},`,
     '',
-    `Greetings from ${businessName}.`,
-    '',
     'This is a courteous reminder regarding your loan account. Details are as follows:',
     '',
     ...loanDetailsBlock(loan),
-    ...messageClosing(businessName),
+    ...messageClosing(),
   ]
   return lines.join('\n')
 }
@@ -57,28 +51,20 @@ export function buildLoanReminderMessage(
 export function buildBorrowerReminderMessage(
   borrower: Borrower,
   loans: Loan[],
-  businessName: string,
 ): string {
   const active = loans.filter((l) => l.status === 'Active')
   if (active.length === 0) {
     return [
       `Dear ${borrower.name},`,
       '',
-      `Greetings from ${businessName}.`,
-      '',
       'Please contact us at your convenience regarding your loan account.',
       '',
       'Thank you.',
-      '',
-      'Regards,',
-      businessName,
     ].join('\n')
   }
 
   const lines = [
     `Dear ${borrower.name},`,
-    '',
-    `Greetings from ${businessName}.`,
     '',
     'This is a courteous reminder regarding your active loan account(s). Details are as follows:',
     '',
@@ -104,6 +90,6 @@ export function buildBorrowerReminderMessage(
     )
   }
 
-  lines.push(...messageClosing(businessName))
+  lines.push(...messageClosing())
   return lines.join('\n')
 }
